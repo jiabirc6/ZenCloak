@@ -25,6 +25,10 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
             raise HTTPException(status_code=404, detail="档案不存在")
         return profile
 
+    @app.get("/favicon.ico")
+    def favicon() -> Response:
+        return Response(status_code=204)
+
     @app.get("/api/health")
     def health() -> dict:
         return {"ok": True}

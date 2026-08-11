@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZenCloak</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="vendor/lucide.min.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="file-mode.js" defer></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">Z</div>
+        <div class="brand-text">
+          <strong>ZenCloak</strong>
+          <span id="engineLabel">引擎检测中</span>
+        </div>
+      </div>
+      <button id="newProfileBtn" class="btn primary">
+        <i data-lucide="plus"></i>新建档案
+      </button>
+      <nav id="profileList" class="profile-list" aria-label="指纹档案"></nav>
+      <div class="sidebar-foot">
+        <span id="engineDot" class="dot"></span>
+        <span id="engineVersion">CloakBrowser</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="toolbar">
+        <div class="title-block">
+          <h1 id="profileTitle">未选择档案</h1>
+          <div class="status-row">
+            <span id="statusBadge" class="badge stopped">已停止</span>
+            <span id="statusTime"></span>
+          </div>
+        </div>
+        <div class="toolbar-actions">
+          <button id="deleteBtn" class="btn danger"><i data-lucide="trash-2"></i>删除</button>
+          <button id="stopBtn" class="btn" disabled><i data-lucide="square"></i>停止</button>
+          <button id="launchBtn" class="btn primary"><i data-lucide="play"></i>启动</button>
+          <button id="saveBtn" class="btn accent"><i data-lucide="save"></i>保存</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="basic" role="tab" aria-selected="true">基本信息</button>
+          <button class="tab" data-tab="fingerprint" role="tab" aria-selected="false">指纹</button>
+          <button class="tab" data-tab="proxy" role="tab" aria-selected="false">代理</button>
+          <button class="tab" data-tab="behavior" role="tab" aria-selected="false">行为</button>
+        </div>
+        <form id="profileForm" class="form">
+          <div class="view active" data-view="basic">
+            <div class="field">
+              <label for="name">档案名称</label>
+              <input id="name" type="text" maxlength="32" required>
+            </div>
+            <div class="field">
+              <label>识别色</label>
+              <div id="colorPicker" class="colors"></div>
+            </div>
+            <div class="field full">
+              <label for="startUrl">起始页</label>
+              <input id="startUrl" type="url" placeholder="https://">
+            </div>
+            <div class="field full">
+              <label for="notes">备注</label>
+              <textarea id="notes"></textarea>
+            </div>
+          </div>
+
+          <div class="view" data-view="fingerprint">
+            <div class="field">
+              <label for="seed">指纹种子</label>
+              <input id="seed" type="number" min="10000" max="99999" step="1">
+            </div>
+            <div class="field">
+              <label for="timezone">时区</label>
+              <select id="timezone">
+                <option value="Asia/Shanghai">Asia/Shanghai</option>
+                <option value="Asia/Tokyo">Asia/Tokyo</option>
+                <option value="Asia/Singapore">Asia/Singapore</option>
+                <option value="Europe/London">Europe/London</option>
+                <option value="Europe/Berlin">Europe/Berlin</option>
+                <option value="America/New_York">America/New_York</option>
+                <option value="America/Los_Angeles">America/Los_Angeles</option>
+                <option value="Australia/Sydney">Australia/Sydney</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="locale">语言</label>
+              <select id="locale">
+                <option>zh-CN</option>
+                <option>en-US</option>
+                <option>ja-JP</option>
+                <option>ko-KR</option>
+                <option>de-DE</option>
+                <option>fr-FR</option>
+                <option>ru-RU</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="screen">屏幕</label>
+              <select id="screen">
+                <option value="1366x768">1366 x 768</option>
+                <option value="1440x900">1440 x 900</option>
+                <option value="1536x864">1536 x 864</option>
+                <option value="1920x1080">1920 x 1080</option>
+                <option value="2560x1440">2560 x 1440</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="hardwareConcurrency">CPU 核数</label>
+              <select id="hardwareConcurrency">
+                <option value="2">2</option>
+                <option value="4">4</option>
+                <option value="8">8</option>
+                <option value="12">12</option>
+                <option value="16">16</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="deviceMemory">设备内存</label>
+              <select id="deviceMemory">
+                <option value="4">4 GB</option>
+                <option value="8">8 GB</option>
+                <option value="16">16 GB</option>
+                <option value="32">32 GB</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label for="userAgent">User-Agent</label>
+              <input id="userAgent" type="text" placeholder="留空使用默认">
+            </div>
+          </div>
+
+          <div class="view" data-view="proxy">
+            <div class="field full toggle-field">
+              <label class="toggle">
+                <input id="proxyEnabled" type="checkbox">
+                <span>启用代理</span>
+              </label>
+            </div>
+            <div class="field">
+              <label for="proxyType">代理协议</label>
+              <select id="proxyType">
+                <option value="http">HTTP</option>
+                <option value="socks5">SOCKS5</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="proxyHost">主机</label>
+              <input id="proxyHost" type="text" placeholder="proxy.example.com">
+            </div>
+            <div class="field">
+              <label for="proxyPort">端口</label>
+              <input id="proxyPort" type="number" min="1" max="65535" placeholder="8080">
+            </div>
+            <div class="field">
+              <label for="proxyUsername">用户名</label>
+              <input id="proxyUsername" type="text" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="proxyPassword">密码</label>
+              <input id="proxyPassword" type="password" autocomplete="new-password">
+            </div>
+          </div>
+
+          <div class="view" data-view="behavior">
+            <div class="field full toggle-field">
+              <label class="toggle">
+                <input id="humanize" type="checkbox">
+                <span>类人行为</span>
+              </label>
+            </div>
+            <div class="field">
+              <label for="humanPreset">行为预置</label>
+              <select id="humanPreset">
+                <option value="default">Default</option>
+                <option value="careful">Careful</option>
+                <option value="quick">Quick</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="detect-wrap">
+        <div class="detect-label"><i data-lucide="radar"></i>检测站点</div>
+        <div class="detect-bar">
+          <button class="detect-btn" data-url="https://browserscan.net/bot-detection"><i data-lucide="scan"></i>BrowserScan</button>
+          <button class="detect-btn" data-url="https://demo.fingerprint.com/playground"><i data-lucide="fingerprint"></i>FingerprintJS</button>
+          <button class="detect-btn" data-url="https://browserleaks.com/canvas"><i data-lucide="paintbrush"></i>BrowserLeaks</button>
+          <button class="detect-btn" data-url="https://bot.incolumitas.com"><i data-lucide="shield"></i>Incolumitas</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+</body>
+</html>

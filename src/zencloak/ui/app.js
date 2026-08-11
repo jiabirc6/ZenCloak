@@ -1,0 +1,371 @@
+const PALETTE = ["#0ea5a4", "#f59e0b", "#22c55e", "#38bdf8", "#f472b6"];
+
+const STATUS_TEXT = {
+  launching: "启动中",
+  running: "运行中",
+  stopping: "停止中",
+  stopped: "已停止",
+  error: "异常",
+};
+
+const state = {
+  profiles: [],
+  sessions: [],
+  selectedId: null,
+  selectedColor: PALETTE[0],
+  engine: { available: false, version: null },
+};
+
+const $ = (id) => document.getElementById(id);
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (response.status === 204) return null;
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = data && (data.detail || data.message);
+    throw new Error(detail || `请求失败 (${response.status})`);
+  }
+  return data;
+}
+
+function toast(message, isError = false) {
+  const el = $("toast");
+  el.textContent = message;
+  el.classList.toggle("error", isError);
+  el.classList.add("show");
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+function statusOf(profileId) {
+  return state.sessions.find((s) => s.profile_id === profileId) || {
+    status: "stopped",
+    started_at: null,
+    stopped_at: null,
+    error: null,
+  };
+}
+
+function formatTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+
+async function loadEngine() {
+  state.engine = await api("/api/engine");
+  const dot = $("engineDot");
+  const version = $("engineVersion");
+  const label = $("engineLabel");
+  dot.classList.toggle("ok", state.engine.available);
+  dot.classList.toggle("bad", !state.engine.available);
+  version.textContent = state.engine.available
+    ? `CloakBrowser ${state.engine.version || ""}`.trim()
+    : "引擎不可用";
+  label.textContent = state.engine.available ? "引擎就绪" : "引擎检测中";
+}
+
+async function loadProfiles() {
+  state.profiles = await api("/api/profiles");
+  if (!state.selectedId || !state.profiles.some((p) => p.id === state.selectedId)) {
+    state.selectedId = state.profiles[0] ? state.profiles[0].id : null;
+  }
+  renderProfileList();
+  renderForm();
+}
+
+function renderProfileList() {
+  const list = $("profileList");
+  list.innerHTML = "";
+  for (const profile of state.profiles) {
+    const item = document.createElement("button");
+    item.className = "profile-item" + (profile.id === state.selectedId ? " active" : "");
+    item.type = "button";
+    const status = statusOf(profile.id);
+    item.innerHTML = `
+      <span class="pcolor" style="background:${profile.color}"></span>
+      <span class="pname">${escapeHtml(profile.name)}<small>指纹 ${profile.seed}</small></span>
+      <span class="pstatus ${status.status}"></span>
+    `;
+    item.addEventListener("click", () => selectProfile(profile.id));
+    list.appendChild(item);
+  }
+  $("profileTitle").textContent = state.selectedId
+    ? state.profiles.find((p) => p.id === state.selectedId)?.name || "未选择档案"
+    : "未选择档案";
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function selectProfile(id) {
+  if (state.selectedId !== id) {
+    state.selectedId = id;
+    renderProfileList();
+    renderForm();
+  }
+  loadSessions();
+}
+
+function renderForm() {
+  const profile = state.profiles.find((p) => p.id === state.selectedId);
+  const hasProfile = Boolean(profile);
+  $("saveBtn").disabled = !hasProfile;
+  $("launchBtn").disabled = !hasProfile;
+  $("deleteBtn").disabled = !hasProfile;
+  $("stopBtn").disabled = true;
+  if (!profile) {
+    $("profileForm").reset();
+    $("colorPicker").innerHTML = "";
+    $("statusBadge").textContent = "已停止";
+    return;
+  }
+  $("name").value = profile.name || "";
+  $("startUrl").value = profile.start_url || "";
+  $("notes").value = profile.notes || "";
+  $("seed").value = profile.seed;
+  $("timezone").value = profile.timezone;
+  $("locale").value = profile.locale;
+  $("screen").value = `${profile.screen_width}x${profile.screen_height}`;
+  $("hardwareConcurrency").value = String(profile.hardware_concurrency);
+  $("deviceMemory").value = String(profile.device_memory);
+  $("userAgent").value = profile.user_agent || "";
+  $("humanize").checked = Boolean(profile.humanize);
+  $("humanPreset").value = profile.human_preset || "default";
+  const proxy = profile.proxy;
+  $("proxyEnabled").checked = Boolean(proxy);
+  $("proxyType").value = proxy ? proxy.type : "http";
+  $("proxyHost").value = proxy ? proxy.host : "";
+  $("proxyPort").value = proxy ? proxy.port : "";
+  $("proxyUsername").value = proxy ? proxy.username || "" : "";
+  $("proxyPassword").value = proxy ? proxy.password || "" : "";
+  renderColorSwatches(profile.color || PALETTE[0]);
+  setProxyEnabled(Boolean(proxy));
+  renderSessionControls();
+}
+
+function renderColorSwatches(activeColor) {
+  state.selectedColor = activeColor;
+  const picker = $("colorPicker");
+  picker.innerHTML = "";
+  for (const color of PALETTE) {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "swatch" + (color === activeColor ? " active" : "");
+    swatch.style.background = color;
+    swatch.title = color;
+    swatch.addEventListener("click", () => {
+      state.selectedColor = color;
+      renderColorSwatches(color);
+    });
+    picker.appendChild(swatch);
+  }
+}
+
+function setProxyEnabled(enabled) {
+  $("proxyType").disabled = !enabled;
+  $("proxyHost").disabled = !enabled;
+  $("proxyPort").disabled = !enabled;
+  $("proxyUsername").disabled = !enabled;
+  $("proxyPassword").disabled = !enabled;
+}
+
+async function loadSessions() {
+  try {
+    state.sessions = await api("/api/sessions");
+  } catch (error) {
+    return;
+  }
+  renderProfileList();
+  renderSessionControls();
+}
+
+function renderSessionControls() {
+  if (!state.selectedId) return;
+  const session = statusOf(state.selectedId);
+  const badge = $("statusBadge");
+  badge.className = "badge " + session.status;
+  badge.textContent = STATUS_TEXT[session.status] || session.status;
+  if (session.status === "error" && session.error) {
+    badge.title = session.error;
+    $("statusTime").textContent = session.error;
+  } else {
+    badge.title = "";
+    $("statusTime").textContent =
+      session.status === "running" && session.started_at
+        ? `启动于 ${formatTime(session.started_at)}`
+        : session.status === "stopped" && session.stopped_at
+          ? `停止于 ${formatTime(session.stopped_at)}`
+          : "";
+  }
+  const running = session.status === "running" || session.status === "launching";
+  $("launchBtn").disabled = running;
+  $("stopBtn").disabled = !running;
+  $("deleteBtn").disabled = Boolean(running);
+}
+
+function readForm() {
+  const screen = $("screen").value.split("x").map(Number);
+  const proxyEnabled = $("proxyEnabled").checked;
+  return {
+    name: $("name").value.trim() || "未命名档案",
+    color: state.selectedColor,
+    notes: $("notes").value,
+    seed: Number($("seed").value),
+    timezone: $("timezone").value,
+    locale: $("locale").value,
+    screen_width: screen[0],
+    screen_height: screen[1],
+    hardware_concurrency: Number($("hardwareConcurrency").value),
+    device_memory: Number($("deviceMemory").value),
+    user_agent: $("userAgent").value.trim() || null,
+    proxy: proxyEnabled
+      ? {
+          type: $("proxyType").value,
+          host: $("proxyHost").value.trim(),
+          port: Number($("proxyPort").value),
+          username: $("proxyUsername").value.trim(),
+          password: $("proxyPassword").value,
+        }
+      : null,
+    humanize: $("humanize").checked,
+    human_preset: $("humanPreset").value,
+    headless: false,
+  };
+}
+
+async function createProfile() {
+  try {
+    const created = await api("/api/profiles", {
+      method: "POST",
+      body: JSON.stringify({ name: "新档案" }),
+    });
+    state.selectedId = created.id;
+    await loadProfiles();
+    await loadSessions();
+    toast("已创建新档案");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function saveProfile() {
+  if (!state.selectedId) return;
+  try {
+    const payload = readForm();
+    const updated = await api(`/api/profiles/${state.selectedId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    const index = state.profiles.findIndex((p) => p.id === updated.id);
+    if (index >= 0) state.profiles[index] = updated;
+    renderProfileList();
+    renderForm();
+    toast("档案已保存");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function deleteProfile() {
+  if (!state.selectedId) return;
+  const profile = state.profiles.find((p) => p.id === state.selectedId);
+  if (!window.confirm(`删除档案「${profile ? profile.name : ""}」？`)) return;
+  try {
+    await api(`/api/profiles/${state.selectedId}`, { method: "DELETE" });
+    state.selectedId = null;
+    await loadProfiles();
+    await loadSessions();
+    toast("档案已删除");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function launchProfile() {
+  if (!state.selectedId) return;
+  try {
+    await api(`/api/sessions/${state.selectedId}/launch`, { method: "POST" });
+    await loadSessions();
+    toast("浏览器正在启动");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function stopProfile() {
+  if (!state.selectedId) return;
+  try {
+    await api(`/api/sessions/${state.selectedId}/stop`, { method: "POST" });
+    await loadSessions();
+    toast("浏览器已停止");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function openDetectUrl(url) {
+  if (!state.selectedId) return;
+  const session = statusOf(state.selectedId);
+  if (session.status !== "running") {
+    toast("请先启动档案再打开检测站点", true);
+    return;
+  }
+  try {
+    await api(`/api/sessions/${state.selectedId}/open`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+    toast("检测页面已打开");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+function bindEvents() {
+  $("newProfileBtn").addEventListener("click", createProfile);
+  $("saveBtn").addEventListener("click", saveProfile);
+  $("launchBtn").addEventListener("click", launchProfile);
+  $("stopBtn").addEventListener("click", stopProfile);
+  $("deleteBtn").addEventListener("click", deleteProfile);
+  $("proxyEnabled").addEventListener("change", (event) => setProxyEnabled(event.target.checked));
+
+  for (const tab of document.querySelectorAll(".tab")) {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => {
+        t.classList.toggle("active", t === tab);
+        t.setAttribute("aria-selected", String(t === tab));
+      });
+      document.querySelectorAll(".view").forEach((view) => {
+        view.classList.toggle("active", view.dataset.view === tab.dataset.tab);
+      });
+    });
+  }
+
+  for (const button of document.querySelectorAll(".detect-btn")) {
+    button.addEventListener("click", () => openDetectUrl(button.dataset.url));
+  }
+}
+
+async function init() {
+  bindEvents();
+  if (window.lucide) window.lucide.createIcons();
+  try {
+    await Promise.all([loadEngine(), loadProfiles(), loadSessions()]);
+  } catch (error) {
+    toast(error.message, true);
+  }
+  setInterval(loadSessions, 2000);
+}
+
+init();
