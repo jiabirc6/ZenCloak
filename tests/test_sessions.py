@@ -1,6 +1,4 @@
-import json
 import time
-from pathlib import Path
 
 import pytest
 
@@ -149,23 +147,9 @@ def test_launch_keeps_single_blank_page_when_no_start_url(tmp_path):
     assert contexts[0][1].pages[0].closed is False
 
 
-def test_launch_builds_newtab_extension_when_start_url_set(tmp_path):
+def test_launch_does_not_load_newtab_extension(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile(start_url="https://example.com/path?q=1"))
-    _wait_status(manager, "aaaaaaaaaaaa", "running")
-    extension_paths = contexts[0][0]["extension_paths"]
-    assert len(extension_paths) == 1
-    ext_dir = Path(extension_paths[0])
-    assert ext_dir.name == "newtab-v2"
-    manifest = json.loads((ext_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["chrome_url_overrides"]["newtab"] == "newtab.html"
-    html = (ext_dir / "newtab.html").read_text(encoding="utf-8")
-    assert "https://example.com/path?q=1" in html
-
-
-def test_launch_does_not_build_extension_without_start_url(tmp_path):
-    manager, contexts = _manager(tmp_path)
-    manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     assert "extension_paths" not in contexts[0][0]
 

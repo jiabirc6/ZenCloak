@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from cloakbrowser import launch_persistent_context
 
-from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
+from .extensions import cleanup_stale_newtab_extensions
 
 
 class SessionError(RuntimeError):
@@ -15,7 +15,6 @@ class SessionError(RuntimeError):
 
 
 _BLANK_URLS = ("about:blank", "chrome://newtab", "chrome://newtab/")
-_NEWTAB_EXTENSION_DIR = "newtab-v2"
 
 
 def _now_iso() -> str:
@@ -186,16 +185,9 @@ class SessionManager:
             "humanize": profile["humanize"],
             "human_preset": profile["human_preset"],
         }
-        if profile.get("start_url"):
-            cleanup_stale_newtab_extensions(
-                profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
-            )
-            ext_dir = build_newtab_extension(
-                profile,
-                self.data_root,
-                dir_name=_NEWTAB_EXTENSION_DIR,
-            )
-            kwargs["extension_paths"] = [str(ext_dir)]
+        cleanup_stale_newtab_extensions(
+            profile, self.data_root, keep_dir="__none__"
+        )
         proxy = profile.get("proxy")
         if proxy:
             proxy_dict = {
