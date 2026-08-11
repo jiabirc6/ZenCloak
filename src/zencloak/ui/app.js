@@ -18,6 +18,8 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
+let formDirty = false;
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -128,6 +130,7 @@ function renderForm() {
     $("profileForm").reset();
     $("colorPicker").innerHTML = "";
     $("statusBadge").textContent = "已停止";
+    formDirty = false;
     return;
   }
   $("name").value = profile.name || "";
@@ -151,6 +154,7 @@ function renderForm() {
   $("proxyPassword").value = proxy ? proxy.password || "" : "";
   renderColorSwatches(profile.color || PALETTE[0]);
   setProxyEnabled(Boolean(proxy));
+  formDirty = false;
   renderSessionControls();
 }
 
@@ -166,6 +170,7 @@ function renderColorSwatches(activeColor) {
     swatch.title = color;
     swatch.addEventListener("click", () => {
       state.selectedColor = color;
+      formDirty = true;
       renderColorSwatches(color);
     });
     picker.appendChild(swatch);
@@ -229,6 +234,7 @@ function readForm() {
     hardware_concurrency: Number($("hardwareConcurrency").value),
     device_memory: Number($("deviceMemory").value),
     user_agent: $("userAgent").value.trim() || null,
+    start_url: $("startUrl").value.trim() || null,
     proxy: proxyEnabled
       ? {
           type: $("proxyType").value,
@@ -260,7 +266,7 @@ async function createProfile() {
 }
 
 async function saveProfile() {
-  if (!state.selectedId) return;
+  if (!state.selectedId) return false;
   try {
     const payload = readForm();
     const updated = await api(`/api/profiles/${state.selectedId}`, {
@@ -271,9 +277,12 @@ async function saveProfile() {
     if (index >= 0) state.profiles[index] = updated;
     renderProfileList();
     renderForm();
+    formDirty = false;
     toast("档案已保存");
+    return true;
   } catch (error) {
     toast(error.message, true);
+    return false;
   }
 }
 
@@ -294,6 +303,10 @@ async function deleteProfile() {
 
 async function launchProfile() {
   if (!state.selectedId) return;
+  if (formDirty) {
+    const saved = await saveProfile();
+    if (!saved) return;
+  }
   try {
     await api(`/api/sessions/${state.selectedId}/launch`, { method: "POST" });
     await loadSessions();
@@ -332,13 +345,22 @@ async function openDetectUrl(url) {
   }
 }
 
+function markFormDirty() {
+  formDirty = true;
+}
+
 function bindEvents() {
   $("newProfileBtn").addEventListener("click", createProfile);
   $("saveBtn").addEventListener("click", saveProfile);
   $("launchBtn").addEventListener("click", launchProfile);
   $("stopBtn").addEventListener("click", stopProfile);
   $("deleteBtn").addEventListener("click", deleteProfile);
-  $("proxyEnabled").addEventListener("change", (event) => setProxyEnabled(event.target.checked));
+  $("profileForm").addEventListener("input", markFormDirty);
+  $("profileForm").addEventListener("change", markFormDirty);
+  $("proxyEnabled").addEventListener("change", (event) => {
+    formDirty = true;
+    setProxyEnabled(event.target.checked);
+  });
 
   for (const tab of document.querySelectorAll(".tab")) {
     tab.addEventListener("click", () => {

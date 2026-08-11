@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -8,6 +9,19 @@ from .fingerprint import (
     HUMAN_PRESETS,
     SUPPORTED_SCREENS,
 )
+
+_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+
+def normalize_start_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if not _SCHEME_RE.match(value):
+        value = "https://" + value
+    return value
 
 
 class ProxySettings(BaseModel):
@@ -64,6 +78,11 @@ class Profile(BaseModel):
         if value not in HUMAN_PRESETS:
             raise ValueError("Unsupported human preset")
         return value
+
+    @field_validator("start_url")
+    @classmethod
+    def normalize_start_url(cls, value: str | None) -> str | None:
+        return normalize_start_url(value)
 
     @model_validator(mode="after")
     def screen_pair_supported(self) -> "Profile":

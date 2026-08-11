@@ -88,3 +88,18 @@ def test_invalid_screen_rejected(store):
 def test_invalid_human_preset_rejected(store):
     with pytest.raises(ValidationError):
         store.create_profile({**_draft(), "human_preset": "robot"})
+
+
+def test_start_url_without_scheme_is_normalized_to_https(store):
+    profile = store.create_profile({**_draft(), "start_url": "google.com"})
+    assert store.get_profile(profile["id"])["start_url"] == "https://google.com"
+
+
+def test_start_url_with_http_scheme_kept(store):
+    profile = store.create_profile({**_draft(), "start_url": "http://example.com"})
+    assert store.get_profile(profile["id"])["start_url"] == "http://example.com"
+
+
+def test_empty_start_url_becomes_none(store):
+    profile = store.create_profile({**_draft(), "start_url": "   "})
+    assert store.get_profile(profile["id"])["start_url"] is None
