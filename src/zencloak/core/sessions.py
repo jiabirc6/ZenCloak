@@ -138,11 +138,20 @@ class SessionManager:
             session["status"] = "stopping"
         return self.status(profile_id)
 
-    def stop_all(self) -> None:
+    def stop_all(self, wait: bool = True) -> None:
         with self._lock:
             profile_ids = list(self._sessions)
         for profile_id in profile_ids:
             self.stop(profile_id)
+        if wait:
+            with self._lock:
+                threads = [
+                    s["thread"]
+                    for s in self._sessions.values()
+                    if s.get("thread") is not None
+                ]
+            for thread in threads:
+                thread.join(timeout=5)
 
     def status(self, profile_id: str | None = None) -> dict | list[dict]:
         with self._lock:

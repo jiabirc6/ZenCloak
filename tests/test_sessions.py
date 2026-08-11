@@ -186,6 +186,21 @@ def test_stop_reaches_stopped_and_closes_context(tmp_path):
     assert contexts[0][1].closed is True
 
 
+def test_stop_all_closes_all_contexts_and_joins_threads(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile("aaaaaaaaaaaa"))
+    manager.launch(_profile("bbbbbbbbbbbb"))
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    _wait_status(manager, "bbbbbbbbbbbb", "running")
+    manager.stop_all()
+    _wait_status(manager, "aaaaaaaaaaaa", "stopped")
+    _wait_status(manager, "bbbbbbbbbbbb", "stopped")
+    assert all(context.closed for _, context in contexts)
+    with manager._lock:
+        threads = [s["thread"] for s in manager._sessions.values() if s.get("thread")]
+    assert all(not thread.is_alive() for thread in threads)
+
+
 def test_launcher_error_records_error(tmp_path):
     def broken_launcher(**_):
         raise RuntimeError("boom")
@@ -199,15 +214,3 @@ def test_launcher_error_records_error(tmp_path):
 def test_status_for_unknown_profile_is_stopped(tmp_path):
     manager, _ = _manager(tmp_path)
     assert manager.status("missing")["status"] == "stopped"
-
-
-def test_stop_all_closes_all_contexts(tmp_path):
-    manager, contexts = _manager(tmp_path)
-    manager.launch(_profile("aaaaaaaaaaaa"))
-    manager.launch(_profile("bbbbbbbbbbbb"))
-    _wait_status(manager, "aaaaaaaaaaaa", "running")
-    _wait_status(manager, "bbbbbbbbbbbb", "running")
-    manager.stop_all()
-    _wait_status(manager, "aaaaaaaaaaaa", "stopped")
-    _wait_status(manager, "bbbbbbbbbbbb", "stopped")
-    assert all(context.closed for _, context in contexts)
