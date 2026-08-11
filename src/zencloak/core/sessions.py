@@ -1,6 +1,5 @@
 import threading
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from queue import Empty, Queue
@@ -16,6 +15,7 @@ class SessionError(RuntimeError):
 
 
 _BLANK_URLS = ("about:blank", "chrome://newtab", "chrome://newtab/")
+_NEWTAB_EXTENSION_DIR = "newtab-v2"
 
 
 def _now_iso() -> str:
@@ -190,7 +190,7 @@ class SessionManager:
             ext_dir = build_newtab_extension(
                 profile,
                 self.data_root,
-                dir_name=f"newtab-{uuid.uuid4().hex[:10]}",
+                dir_name=_NEWTAB_EXTENSION_DIR,
             )
             kwargs["extension_paths"] = [str(ext_dir)]
         proxy = profile.get("proxy")
