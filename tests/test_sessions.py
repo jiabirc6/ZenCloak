@@ -25,11 +25,16 @@ class FakeBrowser:
 class FakeContext:
     def __init__(self):
         self.browser = FakeBrowser()
-        self.page = FakePage()
+        self.page = None
+        self.pages = []
         self.closed = False
 
     def new_page(self):
-        return self.page
+        page = FakePage()
+        self.pages.append(page)
+        if self.page is None:
+            self.page = page
+        return page
 
     def close(self):
         self.closed = True
@@ -68,6 +73,15 @@ def _wait_status(manager, profile_id, target, timeout=5):
             return
         time.sleep(0.02)
     raise AssertionError(f"status != {target}: {manager.status(profile_id)}")
+
+
+def _wait_url(context, url, timeout=3):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if any(url in page.urls for page in context.pages):
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"url not opened: {url}")
 
 
 def test_launch_reaches_running_and_uses_profile_data_dir(tmp_path):
@@ -117,6 +131,20 @@ def test_launch_opens_start_url_after_running(tmp_path):
     manager.launch(_profile(start_url="https://example.com"))
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     assert contexts[0][1].page.urls == ["https://example.com"]
+
+
+def test_open_url_after_running_opens_new_page(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    manager.open_url("aaaaaaaaaaaa", "https://detect.example")
+    _wait_url(contexts[0][1], "https://detect.example")
+
+
+def test_open_url_when_stopped_raises(tmp_path):
+    manager, _ = _manager(tmp_path)
+    with pytest.raises(SessionError):
+        manager.open_url("aaaaaaaaaaaa", "https://detect.example")
 
 
 def test_second_launch_while_running_raises(tmp_path):

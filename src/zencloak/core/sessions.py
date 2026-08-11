@@ -2,6 +2,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from queue import Empty, Queue
 from typing import Any, Callable
 
 from cloakbrowser import launch_persistent_context
@@ -41,6 +42,7 @@ class SessionManager:
                 "stopped_at": None,
                 "error": None,
                 "stop_event": threading.Event(),
+                "urls": Queue(),
                 "context": None,
                 "thread": None,
             }
@@ -58,6 +60,14 @@ class SessionManager:
             "error": None,
         }
 
+    def open_url(self, profile_id: str, url: str) -> dict:
+        with self._lock:
+            session = self._sessions.get(profile_id)
+            if not session or session["status"] not in {"launching", "running"}:
+                raise SessionError("档案未运行")
+            session["urls"].put(url)
+        return self.status(profile_id)
+
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
             context = self._launcher(**self._build_launch_kwargs(profile))
@@ -65,10 +75,13 @@ class SessionManager:
                 session["context"] = context
                 session["status"] = "running"
                 session["error"] = None
-            self._open_start_url(context, profile)
+            if profile.get("start_url"):
+                self._open_page(context, profile["start_url"])
+            self._open_urls_from_queue(context, session)
             while not session["stop_event"].is_set():
                 if not context.browser.is_connected():
                     break
+                self._open_urls_from_queue(context, session)
                 time.sleep(0.3)
             self._close_safely(context)
             with self._lock:
@@ -78,6 +91,14 @@ class SessionManager:
             with self._lock:
                 session["status"] = "error"
                 session["error"] = f"{type(exc).__name__}: {exc}"
+
+    def _open_urls_from_queue(self, context: Any, session: dict[str, Any]) -> None:
+        while True:
+            try:
+                url = session["urls"].get_nowait()
+            except Empty:
+                return
+            self._open_page(context, url)
 
     def stop(self, profile_id: str) -> dict:
         with self._lock:
@@ -146,13 +167,10 @@ class SessionManager:
             kwargs["proxy"] = proxy_dict
         return kwargs
 
-    def _open_start_url(self, context: Any, profile: dict) -> None:
-        url = profile.get("start_url")
-        if not url:
-            return
+    def _open_page(self, context: Any, url: str) -> None:
         try:
             context.new_page().goto(url, timeout=60000)
-        except Exception:  # noqa: BLE001 - a dead start page should not kill session
+        except Exception:  # noqa: BLE001 - a dead page should not kill session
             pass
 
     def _close_safely(self, context: Any) -> None:
