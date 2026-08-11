@@ -7,9 +7,14 @@ from typing import Any, Callable
 
 from cloakbrowser import launch_persistent_context
 
+from .extensions import build_newtab_extension
+
 
 class SessionError(RuntimeError):
     """Raised when a session cannot be started or controlled."""
+
+
+_BLANK_URLS = ("about:blank", "chrome://newtab", "chrome://newtab/")
 
 
 def _now_iso() -> str:
@@ -75,8 +80,7 @@ class SessionManager:
                 session["context"] = context
                 session["status"] = "running"
                 session["error"] = None
-            if profile.get("start_url"):
-                self._open_page(context, profile["start_url"])
+            self._prepare_start_page(context, profile)
             self._open_urls_from_queue(context, session)
             while not session["stop_event"].is_set():
                 if not context.browser.is_connected():
@@ -99,6 +103,31 @@ class SessionManager:
             except Empty:
                 return
             self._open_page(context, url)
+
+    def _prepare_start_page(self, context: Any, profile: dict) -> None:
+        start_url = profile.get("start_url")
+        try:
+            pages = list(context.pages)
+            blank_pages = [p for p in pages if p.url in _BLANK_URLS]
+            if start_url:
+                if len(pages) == 1 and blank_pages:
+                    blank_pages[0].goto(start_url, timeout=60000)
+                else:
+                    self._open_page(context, start_url)
+                    for blank in blank_pages:
+                        if len(context.pages) > 1:
+                            blank.close()
+            else:
+                for blank in blank_pages[1:]:
+                    if len(context.pages) > 1:
+                        blank.close()
+        except Exception:  # noqa: BLE001 - never let page setup kill the session
+            if start_url:
+                try:
+                    if not any(p.url == start_url for p in context.pages):
+                        self._open_page(context, start_url)
+                except Exception:  # noqa: BLE001 - best effort fallback
+                    pass
 
     def stop(self, profile_id: str) -> dict:
         with self._lock:
@@ -156,6 +185,9 @@ class SessionManager:
             "humanize": profile["humanize"],
             "human_preset": profile["human_preset"],
         }
+        if profile.get("start_url"):
+            ext_dir = build_newtab_extension(profile, self.data_root)
+            kwargs["extension_paths"] = [str(ext_dir)]
         proxy = profile.get("proxy")
         if proxy:
             proxy_dict = {
