@@ -1,5 +1,6 @@
 import html
 import json
+import shutil
 import uuid
 from pathlib import Path
 
@@ -50,3 +51,19 @@ def build_newtab_extension(
     (ext_dir / "newtab.html").write_text(newtab_html, encoding="utf-8")
     (ext_dir / "newtab.js").write_text(_EXTENSION_JS, encoding="utf-8")
     return ext_dir
+
+
+def cleanup_stale_newtab_extensions(
+    profile: dict, data_root: str | Path, keep_dir: str = "newtab-v2"
+) -> None:
+    """Remove old generated new-tab extensions, keeping only the active one."""
+    ext_root = Path(data_root) / profile["id"] / "extensions"
+    if not ext_root.exists():
+        return
+    for child in ext_root.iterdir():
+        if (
+            child.is_dir()
+            and child.name.startswith("newtab")
+            and child.name != keep_dir
+        ):
+            shutil.rmtree(child, ignore_errors=True)

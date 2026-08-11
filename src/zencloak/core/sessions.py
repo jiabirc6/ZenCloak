@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from cloakbrowser import launch_persistent_context
 
-from .extensions import build_newtab_extension
+from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
 
 
 class SessionError(RuntimeError):
@@ -187,6 +187,9 @@ class SessionManager:
             "human_preset": profile["human_preset"],
         }
         if profile.get("start_url"):
+            cleanup_stale_newtab_extensions(
+                profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
+            )
             ext_dir = build_newtab_extension(
                 profile,
                 self.data_root,
