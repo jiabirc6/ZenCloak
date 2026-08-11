@@ -10,7 +10,7 @@ python -m cloakbrowser install   # 若还未下载 stealth Chromium 二进制
 python -m zencloak
 ```
 
-也可以直接双击 `start-zencloak.cmd`。
+日常使用直接双击 `start-zencloak.cmd`，它会用 `pythonw` 在后台启动 ZenCloak，不占用控制台窗口，关掉命令行也不会退出应用。
 
 首次启动会在 `~/.zencloak/` 自动创建「本地档案」。之后在面板里新建多个档案，每个档案拥有独立的指纹种子、持久化 profile、代理和类人行为设置。
 
