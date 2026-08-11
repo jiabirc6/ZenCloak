@@ -1,5 +1,6 @@
 import html
 import json
+import uuid
 from pathlib import Path
 
 
@@ -13,10 +14,13 @@ if (redirect) {
 """
 
 
-def build_newtab_extension(profile: dict, data_root: str | Path) -> Path:
+def build_newtab_extension(
+    profile: dict, data_root: str | Path, dir_name: str | None = None
+) -> Path:
     """Write a Chrome new-tab override extension that redirects to start_url."""
     url = profile["start_url"]
-    ext_dir = Path(data_root) / profile["id"] / "extensions" / "newtab"
+    dir_name = dir_name or f"newtab-{uuid.uuid4().hex[:10]}"
+    ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
     ext_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = {

@@ -156,7 +156,7 @@ def test_launch_builds_newtab_extension_when_start_url_set(tmp_path):
     extension_paths = contexts[0][0]["extension_paths"]
     assert len(extension_paths) == 1
     ext_dir = Path(extension_paths[0])
-    assert ext_dir.name == "newtab"
+    assert ext_dir.name.startswith("newtab-")
     manifest = json.loads((ext_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["chrome_url_overrides"]["newtab"] == "newtab.html"
     html = (ext_dir / "newtab.html").read_text(encoding="utf-8")

@@ -1,5 +1,6 @@
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from queue import Empty, Queue
@@ -186,7 +187,11 @@ class SessionManager:
             "human_preset": profile["human_preset"],
         }
         if profile.get("start_url"):
-            ext_dir = build_newtab_extension(profile, self.data_root)
+            ext_dir = build_newtab_extension(
+                profile,
+                self.data_root,
+                dir_name=f"newtab-{uuid.uuid4().hex[:10]}",
+            )
             kwargs["extension_paths"] = [str(ext_dir)]
         proxy = profile.get("proxy")
         if proxy:
