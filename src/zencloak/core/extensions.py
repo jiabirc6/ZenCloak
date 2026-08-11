@@ -5,13 +5,63 @@ import uuid
 from pathlib import Path
 
 
-_EXTENSION_JS = """const redirect = document.getElementById("redirect");
-if (redirect) {
+_EXTENSION_JS = """function redirectToStart() {
+  const redirect = document.getElementById("redirect");
+  if (!redirect) return;
   const url = redirect.getAttribute("data-url");
-  if (url) {
+  if (url && !location.href.startsWith(url)) {
     location.replace(url);
   }
 }
+redirectToStart();
+const retryTimer = setInterval(() => {
+  if (location.href.startsWith("chrome-extension://")) {
+    redirectToStart();
+  } else {
+    clearInterval(retryTimer);
+  }
+}, 300);
+setTimeout(() => clearInterval(retryTimer), 5000);
+"""
+
+
+def _background_js(start_url: str) -> str:
+    encoded = json.dumps(start_url)
+    return f"""const START_URL = {encoded};
+
+function shouldRedirect(url) {{
+  return url.startsWith("chrome://newtab") || url.startsWith("chrome-extension://");
+}}
+
+function redirectTab(tabId) {{
+  chrome.tabs.get(tabId, (tab) => {{
+    const url = (tab && (tab.url || tab.pendingUrl)) || "";
+    if (shouldRedirect(url)) {{
+      chrome.tabs.update(tabId, {{ url: START_URL }});
+    }}
+  }});
+}}
+
+function scheduleRedirect(tabId) {{
+  redirectTab(tabId);
+  [200, 500, 1000, 2000, 3000].forEach((delay) => {{
+    setTimeout(() => redirectTab(tabId), delay);
+  }});
+}}
+
+chrome.tabs.onCreated.addListener((tab) => {{
+  const url = (tab && (tab.pendingUrl || tab.url)) || "";
+  if (shouldRedirect(url)) {{
+    scheduleRedirect(tab.id);
+  }}
+}});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {{
+  const url = (changeInfo && changeInfo.url) || (tab && tab.url) || "";
+  if (shouldRedirect(url)) {{
+    scheduleRedirect(tabId);
+  }}
+}});
 """
 
 
@@ -30,6 +80,8 @@ def build_newtab_extension(
         "version": "1.0.0",
         "description": "Open the profile start page in new tabs.",
         "chrome_url_overrides": {"newtab": "newtab.html"},
+        "background": {"service_worker": "background.js"},
+        "permissions": ["tabs"],
     }
     (ext_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -50,6 +102,9 @@ def build_newtab_extension(
 </html>"""
     (ext_dir / "newtab.html").write_text(newtab_html, encoding="utf-8")
     (ext_dir / "newtab.js").write_text(_EXTENSION_JS, encoding="utf-8")
+    (ext_dir / "background.js").write_text(
+        _background_js(url), encoding="utf-8"
+    )
     return ext_dir
 
 
