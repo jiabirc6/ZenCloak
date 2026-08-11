@@ -2,6 +2,8 @@
 
 基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
 
+> 新手请先看：[ZenCloak 新手使用教程](docs/zencloak-tutorial.md)
+
 ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实 Chromium 窗口。
 
 ## 特性
