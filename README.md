@@ -1,39 +1,97 @@
 # ZenCloak
 
-基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 构建的专属指纹浏览器桌面客户端。
+基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
 
-## 运行
+ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实 Chromium 窗口。
+
+## 特性
+
+- 多指纹档案：指纹种子、时区、语言、屏幕、CPU 核数、设备内存、User-Agent
+- HTTP / SOCKS5 代理，支持用户名密码
+- 类人鼠标、键盘、滚动行为（`humanize`）
+- 独立持久化 profile：cookie、登录态、历史数据按档案隔离
+- 一键启动 / 停止浏览器窗口
+- 内置 BrowserScan、FingerprintJS、BrowserLeaks、Incolumitas 检测站点入口
+- 本地 API 只监听 `127.0.0.1` 随机端口
+- 首次启动自动创建「本地档案」，默认匹配本机 Windows / Asia/Shanghai / zh-CN
+
+## 环境要求
+
+- Windows 11
+- Python 3.12
+- Node.js 不需要，但本机需要可用的 CloakBrowser binary
+
+## 安装
 
 ```powershell
 python -m pip install -e .
-python -m cloakbrowser install   # 若还未下载 stealth Chromium 二进制
+python -m cloakbrowser install   # 下载 stealth Chromium 二进制
+```
+
+## 启动
+
+日常使用双击 `start-zencloak.cmd`。该脚本通过 `pythonw` 后台启动，不占用控制台窗口，关闭命令行也不会退出应用。
+
+也可以在 PowerShell 中启动：
+
+```powershell
 python -m zencloak
 ```
 
-日常使用直接双击 `start-zencloak.cmd`，它会用 `pythonw` 在后台启动 ZenCloak，不占用控制台窗口，关掉命令行也不会退出应用。
+> 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。
 
-首次启动会在 `~/.zencloak/` 自动创建「本地档案」。之后在面板里新建多个档案，每个档案拥有独立的指纹种子、持久化 profile、代理和类人行为设置。
+## 使用
 
-注意：不要直接双击打开 `src/zencloak/ui/index.html`，请始终通过桌面程序启动。
+1. 首次启动后，左侧默认出现「本地档案」。
+2. 点击「新建档案」创建新身份，按需配置指纹、代理和行为参数。
+3. 点击「保存」写入 `~/.zencloak/profiles/`。
+4. 点击「启动」打开该档案对应的 CloakBrowser 窗口，浏览器数据写入 `~/.zencloak/data/<档案ID>/`。
+5. 档案运行中可点击检测站点按钮，直接在指纹浏览器里打开对应检测页面。
 
-## 功能
+## 数据目录
 
-- 多指纹档案管理：指纹种子、时区、语言、屏幕、CPU 核数、内存、User-Agent
-- HTTP / SOCKS5 代理配置
-- 类人鼠标/键盘/滚动行为（`humanize`）
-- 持久化会话：cookie、登录态、访问历史独立保存
-- 一键启动/停止浏览器窗口
-- 内置 BrowserScan、FingerprintJS、BrowserLeaks、Incolumitas 检测站点入口
+```
+~/.zencloak/
+├── profiles/          # 指纹档案 JSON
+└── data/              # 每个档案的持久化浏览器数据
+```
 
-## 数据
+## 项目结构
 
-- 配置目录：`~/.zencloak/profiles/`
-- 会话数据：`~/.zencloak/data/`
-- 本地 API 仅监听 `127.0.0.1` 随机端口，不对外暴露
+```
+src/zencloak/
+├── app.py             # 桌面入口：uvicorn + pywebview
+├── api.py             # 本地 FastAPI 接口
+├── core/
+│   ├── fingerprint.py # 指纹参数与默认档案
+│   ├── models.py      # 档案数据模型与校验
+│   ├── profiles.py    # 档案 JSON 存储
+│   └── sessions.py    # CloakBrowser 会话管理
+└── ui/                # 桌面 UI（HTML / CSS / JS）
+```
 
 ## 测试
 
 ```powershell
 python -m pytest
-python -m pytest tests/test_smoke_launch.py -v
 ```
+
+包含真实 CloakBrowser 冒烟测试，会验证 `navigator.webdriver=false`、UA 无 Headless 痕迹、插件列表正常。
+
+## 常见问题
+
+**为什么直接打开 `src/zencloak/ui/index.html` 是坏的？**
+
+UI 需要本地 API 才能读取档案。请始终通过 `start-zencloak.cmd` 或 `python -m zencloak` 启动；直接打开 HTML 会显示未连接提示。
+
+**启动时出现 `Update available: cloakbrowser ...` 是什么？**
+
+这是 CloakBrowser 的升级提示，不影响运行。当前 v146 内核免费且无需登录；升级最新内核可能需要 CloakBrowser 账号或授权，按需决定即可。
+
+**代理密码存在哪里？**
+
+当前保存在档案 JSON 中，仅存在于本机用户目录。请勿把 `~/.zencloak/` 或项目内档案文件提交到公开仓库。
+
+## 许可
+
+本项目包装与客户端代码采用 MIT 许可，见 [LICENSE](LICENSE)。CloakBrowser 二进制使用其自身许可，详情见 [CloakBrowser BINARY-LICENSE](https://github.com/CloakHQ/CloakBrowser/blob/main/BINARY-LICENSE.md)。请仅将本工具用于合法、已获授权的场景。
