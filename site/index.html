@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en"><head>
+<html lang="zh-CN"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZenCloak · Give every identity its own browser</title>
-<meta name="description" content="ZenCloak is an open source fingerprint browser for Windows, built on CloakBrowser stealth Chromium. One profile, one isolated browser identity.">
+<title>ZenCloak · 每个身份都有自己的浏览器</title>
+<meta name="description" content="ZenCloak 是基于 CloakBrowser stealth Chromium 的开源指纹浏览器。一个档案，一个隔离的浏览器身份。">
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <meta name="theme-color" content="#000000">
 <link rel="stylesheet" href="styles.css">
@@ -16,9 +16,9 @@
       <img class="mark" src="assets/logo.svg" alt=""> ZenCloak
     </a>
     <nav class="nav-links">
-      <a href="#how">How it works</a>
-      <a href="#opensource">Open source</a>
-      <a href="https://github.com/jiabirc6/ZenCloak#readme">Docs</a>
+      <a href="#how">使用方式</a>
+      <a href="#opensource">开源</a>
+      <a href="https://github.com/jiabirc6/ZenCloak#readme">文档</a>
     </nav>
     <div class="nav-right">
       <a class="gh-pill" href="#opensource">
@@ -26,16 +26,16 @@
         <span class="star-text">Star</span>
         <span class="star" id="starCount">Star</span>
       </a>
-      <a class="btn btn-primary btn-sm" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a>
+      <a class="btn btn-primary btn-sm" href="https://github.com/jiabirc6/ZenCloak/releases/latest">下载</a>
     </div>
     <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false"><span></span></button>
   </div>
 </header>
 <div class="mnav" id="mnav">
-  <a href="#how">How it works</a>
-  <a href="#opensource">Open source</a>
-  <a href="https://github.com/jiabirc6/ZenCloak#readme">Docs</a>
-  <div class="mcta"><a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest" style="width:100%;justify-content:center">Download</a></div>
+  <a href="#how">使用方式</a>
+  <a href="#opensource">开源</a>
+  <a href="https://github.com/jiabirc6/ZenCloak#readme">文档</a>
+  <div class="mcta"><a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest" style="width:100%;justify-content:center">下载</a></div>
 </div>
 
 <a id="top"></a>
@@ -47,11 +47,11 @@
   <div class="hero-veil"></div>
   <div class="hero-inner">
     <div class="hero-copy">
-      <h1 class="reveal in">Give every identity<br>its own browser.</h1>
-      <p class="hero-sub reveal d1 in">One profile, one real, isolated Chromium window. ZenCloak keeps fingerprints, cookies and history separate for every identity you run.</p>
+      <h1 class="reveal in">每个身份，<br>都有自己的浏览器。</h1>
+      <p class="hero-sub reveal d1 in">一个档案，一个真实且隔离的 Chromium 窗口。ZenCloak 为每个身份单独保存指纹、Cookie 和历史记录。</p>
       <div class="hero-actions reveal d2 in">
-        <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a>
-        <a class="btn btn-ghost" href="#how">See how it works</a>
+        <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">下载</a>
+        <a class="btn btn-ghost" href="#how">了解工作原理</a>
       </div>
     </div>
   </div>
@@ -59,9 +59,9 @@
 
 <section class="statband">
   <div class="wrap stats">
-    <div class="stat reveal in"><div class="num" data-count="1" data-suffix=" click">1 click</div><div class="lbl">Profile to browser</div></div>
-    <div class="stat reveal d1 in"><div class="num">Zero state</div><div class="lbl">Fully isolated sessions</div></div>
-    <div class="stat reveal d2 in"><div class="num" data-count="100" data-suffix="%">100%</div><div class="lbl">Real Chromium stealth</div></div>
+    <div class="stat reveal in"><div class="num" data-count="1" data-suffix=" 次点击">1 次点击</div><div class="lbl">档案启动浏览器</div></div>
+    <div class="stat reveal d1 in"><div class="num">零状态</div><div class="lbl">会话完全隔离</div></div>
+    <div class="stat reveal d2 in"><div class="num" data-count="100" data-suffix="%">100%</div><div class="lbl">真实 Chromium 隐身</div></div>
   </div>
 </section>
 
@@ -71,24 +71,24 @@
     <div class="panel-body">
       <div class="section-inner">
         <div class="sec-head">
-          <h2 class="h-section reveal in">One browser is not enough.</h2>
-          <p class="lead reveal d1 in">Chromium was built for one person browsing one set of sites. Juggling stores, work accounts and side projects in a single profile leaks fingerprints, cookies and history between every identity.</p>
+          <h2 class="h-section reveal in">一个浏览器不够用。</h2>
+          <p class="lead reveal d1 in">Chromium 是为一个人浏览一组网站而设计的。在同一个配置档案里同时打理店铺、工作账号和副业，指纹、Cookie 和历史会在每个身份之间互相泄漏。</p>
         </div>
         <div class="prob-grid">
           <div class="prob reveal in">
             <span class="idx">01</span>
-            <h3>Fingerprints follow you</h3>
-            <p>Screen, timezone, language, hardware and User-Agent stay identical across every tab, so sites can link accounts you meant to keep separate.</p>
+            <h3>指纹跟着你走</h3>
+            <p>屏幕、时区、语言、硬件和 User-Agent 在每个标签页里都保持一致，网站因此能把你想分开的账号关联起来。</p>
           </div>
           <div class="prob reveal d1 in">
             <span class="idx">02</span>
-            <h3>State bleeds between accounts</h3>
-            <p>Cookies, logins and cached data carry over from one run to the next, contaminating sessions and making results impossible to reproduce.</p>
+            <h3>状态在账号之间串扰</h3>
+            <p>Cookie、登录态和缓存数据会从上一次运行带到下一次，污染会话，让结果无法复现。</p>
           </div>
           <div class="prob reveal d2 in">
             <span class="idx">03</span>
-            <h3>Setup is manual</h3>
-            <p>Building a fresh identity means digging through flags, extensions, proxies and browser settings every single time.</p>
+            <h3>配置全靠手动</h3>
+            <p>每次建立新身份都要翻遍 flags、扩展、代理和浏览器设置。</p>
           </div>
         </div>
       </div>
@@ -99,29 +99,29 @@
     <div class="panel-body">
       <div class="section-inner">
         <div class="sec-head">
-          <h2 class="h-section reveal in">A browser identity, redefined.</h2>
-          <p class="lead reveal d1 in">ZenCloak keeps exactly what a real identity needs: a clean, persistent Chromium profile with a stable fingerprint, per-profile data and no cross-contamination.</p>
+          <h2 class="h-section reveal in">重新定义浏览器身份。</h2>
+          <p class="lead reveal d1 in">ZenCloak 只保留真实身份需要的东西：干净且持久的 Chromium 档案、稳定的指纹、按档案隔离的数据，互不串扰。</p>
         </div>
         <div class="feat-grid">
           <div class="feat reveal in">
-            <div class="metric">1 click</div>
-            <h3>Launch any profile</h3>
-            <p>Create a fingerprint seed once. ZenCloak starts a real stealth Chromium window in one click, with that identity already applied.</p>
+            <div class="metric">1 次点击</div>
+            <h3>一键启动任意档案</h3>
+            <p>指纹种子只需创建一次。ZenCloak 一键启动真实的 stealth Chromium 窗口，身份已经就位。</p>
           </div>
           <div class="feat reveal d1 in">
-            <div class="metric">Zero state</div>
-            <h3>Isolated every time</h3>
-            <p>Cookies, logins and history live inside each profile folder. Nothing is shared between profiles, nothing leaks between sessions.</p>
+            <div class="metric">零状态</div>
+            <h3>每次彻底隔离</h3>
+            <p>Cookie、登录态和历史只存在于各自档案目录。档案之间不共享任何东西，会话之间不泄漏任何数据。</p>
           </div>
           <div class="feat reveal in">
             <div class="metric">DPAPI</div>
-            <h3>Proxies, encrypted</h3>
-            <p>Attach an HTTP or SOCKS5 proxy per profile. Passwords are encrypted with Windows DPAPI before they ever touch disk.</p>
+            <h3>代理密码加密</h3>
+            <p>每个档案可绑定 HTTP 或 SOCKS5 代理，密码先用 Windows DPAPI 加密再落盘。</p>
           </div>
           <div class="feat reveal d1 in">
             <div class="metric">127.0.0.1</div>
-            <h3>Local API</h3>
-            <p>A local FastAPI surface on a random 127.0.0.1 port, ready for scripts today and MCP automation on the roadmap.</p>
+            <h3>本地 API</h3>
+            <p>本地 FastAPI 监听 127.0.0.1 随机端口，现在就能写脚本，MCP 自动化已在路线图上。</p>
           </div>
         </div>
       </div>
@@ -133,8 +133,8 @@
 <section class="section" id="how">
   <div class="section-inner">
     <div class="sec-head">
-      <h2 class="h-section reveal in">From profile to browser in one call.</h2>
-      <p class="lead reveal d1 in">Keep the desktop app, or drive it from your own scripts. The local API creates profiles, launches sessions and opens URLs over plain HTTP.</p>
+      <h2 class="h-section reveal in">一次调用，从档案到浏览器。</h2>
+      <p class="lead reveal d1 in">继续用桌面客户端，或者用自己的脚本驱动。本地 API 通过普通 HTTP 创建档案、启动会话、打开网址。</p>
     </div>
     <div class="how">
       <div class="code-panel reveal in">
@@ -149,15 +149,15 @@
       <div class="steps reveal d1 in">
         <div class="step">
           <span class="sidx">01</span>
-          <div><h3>Create</h3><p>One profile is one identity: fingerprint seed, timezone, language, screen, proxy and behavior settings.</p></div>
+          <div><h3>创建</h3><p>一个档案就是一个身份：指纹种子、时区、语言、屏幕、代理和行为设置。</p></div>
         </div>
         <div class="step">
           <span class="sidx">02</span>
-          <div><h3>Launch</h3><p>Start a real stealth Chromium window in one click. Cookies and history persist only inside that profile.</p></div>
+          <div><h3>启动</h3><p>一键打开真实 stealth Chromium 窗口，Cookie 和历史只持久化在这个档案内。</p></div>
         </div>
         <div class="step">
           <span class="sidx">03</span>
-          <div><h3>Automate</h3><p>Drive it from the local API today; richer automation and an MCP server are on the roadmap.</p></div>
+          <div><h3>自动化</h3><p>今天用本地 API 驱动，更丰富的自动化和 MCP Server 已在路线图上。</p></div>
         </div>
       </div>
     </div>
@@ -168,14 +168,14 @@
   <div class="section-inner">
     <div class="oss oss-single">
       <div class="reveal in">
-        <h2>Run it your way.</h2>
-        <p>ZenCloak is open source and fully yours. Download the installer or build from source. The engine and your profiles stay on your machine, with no lock-in.</p>
+        <h2>想怎么跑，你说了算。</h2>
+        <p>ZenCloak 完全开源。下载安装包或从源码构建都行，浏览器内核和你的档案始终留在本机，没有锁定。</p>
         <div class="oss-actions">
           <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.49-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.81.06 1.24.83 1.24.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
-            View on GitHub
+            查看 GitHub
           </a>
-          <a class="btn btn-ghost" href="https://github.com/jiabirc6/ZenCloak#readme">Read the docs</a>
+          <a class="btn btn-ghost" href="https://github.com/jiabirc6/ZenCloak#readme">阅读文档</a>
         </div>
       </div>
     </div>
@@ -187,11 +187,11 @@
   <div class="cta-mask"></div>
   <div class="cta-inner">
     <div class="cta-copy">
-      <h2 class="reveal in">Give your identities a<br>better browser.</h2>
-      <p class="reveal d1 in">Download ZenCloak, create a profile, and open a real, isolated Chromium window in under a minute.</p>
+      <h2 class="reveal in">给每个身份一个<br>更好的浏览器。</h2>
+      <p class="reveal d1 in">下载 ZenCloak，创建档案，一分钟后就能打开真实、隔离的 Chromium 窗口。</p>
       <div class="cta-actions reveal d2 in">
-        <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a>
-        <a class="btn btn-ghost" href="#how">See how it works</a>
+        <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">下载</a>
+        <a class="btn btn-ghost" href="#how">了解工作原理</a>
       </div>
     </div>
   </div>
@@ -201,11 +201,11 @@
   <div class="footer-inner">
     <div class="footer-brand">
       <a class="brand brand-lg" href="#top"><img class="mark" src="assets/logo.svg" alt=""> ZenCloak</a>
-      <p class="tagline">The open source fingerprint browser for Windows.</p>
-      <div class="footer-cta"><a class="btn btn-primary btn-sm" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a></div>
+      <p class="tagline">Windows 上的开源指纹浏览器。</p>
+      <div class="footer-cta"><a class="btn btn-primary btn-sm" href="https://github.com/jiabirc6/ZenCloak/releases/latest">下载</a></div>
     </div>
     <pre class="footer-config" aria-label="Footer links"><span class="brace">{</span>
-  <span class="k">copyright</span><span class="p">:</span> <span class="s">"© 2026 ZenCloak. All rights reserved."</span><span class="p">,</span>
+  <span class="k">copyright</span><span class="p">:</span> <span class="s">"© 2026 ZenCloak. 保留所有权利。"</span><span class="p">,</span>
   <span class="k">github</span><span class="p">:</span> <a class="s lnk" href="https://github.com/jiabirc6/ZenCloak">"/jiabirc6/ZenCloak"</a><span class="p">,</span>
   <span class="k">docs</span><span class="p">:</span> <a class="s lnk" href="https://github.com/jiabirc6/ZenCloak#readme">"github.com/jiabirc6/ZenCloak#readme"</a><span class="p">,</span>
   <span class="k">release</span><span class="p">:</span> <a class="s lnk" href="https://github.com/jiabirc6/ZenCloak/releases/latest">"releases/latest"</a><span class="p">,</span>

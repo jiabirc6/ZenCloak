@@ -86,7 +86,7 @@
 
   var snippets = {
     py: [
-      M("# launch a ZenCloak profile over the local API"),
+      M("# 通过本地 API 启动 ZenCloak 档案"),
       K("import") + " requests",
       "",
       "API " + P("=") + " " + S('"http://127.0.0.1:PORT"'),
@@ -99,7 +99,7 @@
       "    json" + P("=") + " {" + S('"url"') + P(":") + " " + S('"https://example.com"') + "})"
     ],
     js: [
-      M("// launch a ZenCloak profile from Node.js"),
+      M("// 用 Node.js 启动 ZenCloak 档案"),
       K("const") + " API " + P("=") + " " + S('"http://127.0.0.1:PORT"') + ";",
       K("const") + " res " + P("=") + " " + K("await") + " fetch(API " + P("+") + " " + S('"/api/profiles"') + ", {",
       "  method" + P(":") + " " + S('"POST"') + ",",
@@ -110,7 +110,7 @@
       K("await") + " fetch(API " + P("+") + " " + S('"/api/sessions/"') + " " + P("+") + " profile.id " + P("+") + " " + S('"/launch"') + ", { method" + P(":") + " " + S('"POST"') + " });"
     ],
     pwsh: [
-      M("# launch a profile from PowerShell"),
+      M("# 用 PowerShell 启动档案"),
       "$API " + P("=") + " " + S('"http://127.0.0.1:PORT"'),
       "$body " + P("=") + " " + S('"{\\"name\\":\\"shop-01\\"}"'),
       "$profile " + P("=") + " Invoke-RestMethod -Method Post -Uri ($API " + P("+") + " " + S('"/api/profiles"') + ") -ContentType " + S('"application/json"') + " -Body $body",

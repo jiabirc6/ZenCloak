@@ -1,6 +1,6 @@
 # ZenCloak
 
-[![Website](https://img.shields.io/badge/website-zencloak.sh-black)](https://jiabirc6.github.io/ZenCloak/)
+[![主页](https://img.shields.io/badge/主页-GitHub%20Pages-black)](https://jiabirc6.github.io/ZenCloak/)
 
 基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
 
