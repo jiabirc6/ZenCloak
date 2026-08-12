@@ -15,24 +15,15 @@ ZenCloak 是跑在你电脑上的一个桌面程序，底层使用 CloakBrowser 
 
 ## 2. 第一次启动
 
-### 2.1 安装（只需要做一次）
+### 2.1 打开 ZenCloak
 
-如果你还没安装过，在 PowerShell 里执行：
+已打包用户直接双击 `dist\ZenCloak.exe`。
 
-```powershell
-python -m pip install -e E:\codex\opencode-zen
-python -m cloakbrowser install
-```
+首次启动需要解压依赖，通常会等待 20 秒左右，之后出现 ZenCloak 主窗口。
 
-第一条命令安装 ZenCloak 本身；第二条命令下载 stealth Chromium 内核（大约 200MB，已下载过会跳过）。
+### 2.2 开发模式
 
-### 2.2 打开 ZenCloak
-
-最推荐的方式：双击仓库根目录的 `start-zencloak.cmd`。
-
-它会后台启动，不占用黑乎乎的 PowerShell 窗口。
-
-也可以在 PowerShell 里手动启动：
+在 PowerShell 里手动启动：
 
 ```powershell
 cd E:\codex\opencode-zen
@@ -122,7 +113,7 @@ python -m zencloak
 - 代理要密码但没填。
 - 存档后忘记点「保存」。
 
-代理密码目前保存在本机档案文件里，请勿把 `~/.zencloak/` 目录上传到公开仓库。
+代理密码已使用 Windows DPAPI 加密保存在本机档案文件中，请勿把 `~/.zencloak/` 目录上传到公开仓库。
 
 ## 7. 启动窗口之后怎么用
 

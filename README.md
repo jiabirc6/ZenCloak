@@ -20,7 +20,7 @@ ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档�
 ## 环境要求
 
 - Windows 11
-- Python 3.12
+- Python 3.12（仅开发模式需要）
 - Node.js 不需要，但本机需要可用的 CloakBrowser binary
 
 ## 安装
@@ -32,15 +32,15 @@ python -m cloakbrowser install   # 下载 stealth Chromium 二进制
 
 ## 启动
 
-日常使用双击 `start-zencloak.cmd`。该脚本通过 `pythonw` 后台启动，不占用控制台窗口，关闭命令行也不会退出应用。
+已打包用户直接双击 `dist\ZenCloak.exe`，单文件、无控制台窗口。
 
-也可以在 PowerShell 中启动：
+开发模式可以在 PowerShell 中启动：
 
 ```powershell
 python -m zencloak
 ```
 
-> 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。
+> 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。单文件 EXE 首次启动需要解压依赖，通常会等待 20 秒左右。
 
 ## 使用
 
@@ -84,7 +84,7 @@ python -m pytest
 
 **为什么直接打开 `src/zencloak/ui/index.html` 是坏的？**
 
-UI 需要本地 API 才能读取档案。请始终通过 `start-zencloak.cmd` 或 `python -m zencloak` 启动；直接打开 HTML 会显示未连接提示。
+UI 需要本地 API 才能读取档案。请始终通过 `dist\ZenCloak.exe` 或 `python -m zencloak` 启动；直接打开 HTML 会显示未连接提示。
 
 **启动时出现 `Update available: cloakbrowser ...` 是什么？**
 
@@ -92,7 +92,7 @@ UI 需要本地 API 才能读取档案。请始终通过 `start-zencloak.cmd` �
 
 **代理密码存在哪里？**
 
-当前保存在档案 JSON 中，仅存在于本机用户目录。请勿把 `~/.zencloak/` 或项目内档案文件提交到公开仓库。
+已使用 Windows DPAPI 加密后保存在档案 JSON 中，仅本机当前用户可解密。请勿把 `~/.zencloak/` 或项目内档案文件提交到公开仓库。
 
 ## 许可
 
