@@ -1,8 +1,12 @@
 # ZenCloak
 
+[![Website](https://img.shields.io/badge/website-zencloak.sh-black)](https://jiabirc6.github.io/ZenCloak/)
+
 基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
 
 > 新手请先看：[ZenCloak 新手使用教程](docs/zencloak-tutorial.md)
+
+主页：<https://jiabirc6.github.io/ZenCloak/>（源码在 [`site/`](site/)）
 
 ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实 Chromium 窗口。
 
@@ -103,3 +107,5 @@ UI 需要本地 API 才能读取档案。请始终通过 `dist\ZenCloak.exe` 或
 ## 许可
 
 本项目包装与客户端代码采用 MIT 许可，见 [LICENSE](LICENSE)。CloakBrowser 二进制使用其自身许可，详情见 [CloakBrowser BINARY-LICENSE](https://github.com/CloakHQ/CloakBrowser/blob/main/BINARY-LICENSE.md)。请仅将本工具用于合法、已获授权的场景。
+
+网站视觉基于 [Obscura](https://github.com/h4ckf0r0day/obscura)（Apache-2.0）的公开主页改编。

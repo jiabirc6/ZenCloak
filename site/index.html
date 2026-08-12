@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZenCloak · Give every identity its own browser</title>
+<meta name="description" content="ZenCloak is an open source fingerprint browser for Windows, built on CloakBrowser stealth Chromium. One profile, one isolated browser identity.">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="ZenCloak home">
+      <img class="mark" src="assets/logo.svg" alt=""> ZenCloak
+    </a>
+    <nav class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#opensource">Open source</a>
+      <a href="https://github.com/jiabirc6/ZenCloak#readme">Docs</a>
+    </nav>
+    <div class="nav-right">
+      <a class="gh-pill" href="#opensource">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.49-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.81.06 1.24.83 1.24.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
+        <span class="star-text">Star</span>
+        <span class="star" id="starCount">Star</span>
+      </a>
+      <a class="btn btn-primary btn-sm" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false"><span></span></button>
+  </div>
+</header>
+<div class="mnav" id="mnav">
+  <a href="#how">How it works</a>
+  <a href="#opensource">Open source</a>
+  <a href="https://github.com/jiabirc6/ZenCloak#readme">Docs</a>
+  <div class="mcta"><a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest" style="width:100%;justify-content:center">Download</a></div>
+</div>
+
+<a id="top"></a>
+
+<section class="hero">
+  <video class="hero-video" autoplay="" muted="" loop="" playsinline="" webkit-playsinline="" preload="auto" disablepictureinpicture="">
+    <source src="assets/hero-bg.mp4" type="video/mp4">
+  </video>
+  <div class="hero-veil"></div>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <h1 class="reveal in">Give every identity<br>its own browser.</h1>
+      <p class="hero-sub reveal d1 in">One profile, one real, isolated Chromium window. ZenCloak keeps fingerprints, cookies and history separate for every identity you run.</p>
+      <div class="hero-actions reveal d2 in">
+        <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="statband">
+  <div class="wrap stats">
+    <div class="stat reveal in"><div class="num" data-count="1" data-suffix=" click">1 click</div><div class="lbl">Profile to browser</div></div>
+    <div class="stat reveal d1 in"><div class="num">Zero state</div><div class="lbl">Fully isolated sessions</div></div>
+    <div class="stat reveal d2 in"><div class="num" data-count="100" data-suffix="%">100%</div><div class="lbl">Real Chromium stealth</div></div>
+  </div>
+</section>
+
+<div class="stack">
+
+  <section class="section stack-panel" id="problem">
+    <div class="panel-body">
+      <div class="section-inner">
+        <div class="sec-head">
+          <h2 class="h-section reveal in">One browser is not enough.</h2>
+          <p class="lead reveal d1 in">Chromium was built for one person browsing one set of sites. Juggling stores, work accounts and side projects in a single profile leaks fingerprints, cookies and history between every identity.</p>
+        </div>
+        <div class="prob-grid">
+          <div class="prob reveal in">
+            <span class="idx">01</span>
+            <h3>Fingerprints follow you</h3>
+            <p>Screen, timezone, language, hardware and User-Agent stay identical across every tab, so sites can link accounts you meant to keep separate.</p>
+          </div>
+          <div class="prob reveal d1 in">
+            <span class="idx">02</span>
+            <h3>State bleeds between accounts</h3>
+            <p>Cookies, logins and cached data carry over from one run to the next, contaminating sessions and making results impossible to reproduce.</p>
+          </div>
+          <div class="prob reveal d2 in">
+            <span class="idx">03</span>
+            <h3>Setup is manual</h3>
+            <p>Building a fresh identity means digging through flags, extensions, proxies and browser settings every single time.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section stack-panel" id="engine">
+    <div class="panel-body">
+      <div class="section-inner">
+        <div class="sec-head">
+          <h2 class="h-section reveal in">A browser identity, redefined.</h2>
+          <p class="lead reveal d1 in">ZenCloak keeps exactly what a real identity needs: a clean, persistent Chromium profile with a stable fingerprint, per-profile data and no cross-contamination.</p>
+        </div>
+        <div class="feat-grid">
+          <div class="feat reveal in">
+            <div class="metric">1 click</div>
+            <h3>Launch any profile</h3>
+            <p>Create a fingerprint seed once. ZenCloak starts a real stealth Chromium window in one click, with that identity already applied.</p>
+          </div>
+          <div class="feat reveal d1 in">
+            <div class="metric">Zero state</div>
+            <h3>Isolated every time</h3>
+            <p>Cookies, logins and history live inside each profile folder. Nothing is shared between profiles, nothing leaks between sessions.</p>
+          </div>
+          <div class="feat reveal in">
+            <div class="metric">DPAPI</div>
+            <h3>Proxies, encrypted</h3>
+            <p>Attach an HTTP or SOCKS5 proxy per profile. Passwords are encrypted with Windows DPAPI before they ever touch disk.</p>
+          </div>
+          <div class="feat reveal d1 in">
+            <div class="metric">127.0.0.1</div>
+            <h3>Local API</h3>
+            <p>A local FastAPI surface on a random 127.0.0.1 port, ready for scripts today and MCP automation on the roadmap.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<section class="section" id="how">
+  <div class="section-inner">
+    <div class="sec-head">
+      <h2 class="h-section reveal in">From profile to browser in one call.</h2>
+      <p class="lead reveal d1 in">Keep the desktop app, or drive it from your own scripts. The local API creates profiles, launches sessions and opens URLs over plain HTTP.</p>
+    </div>
+    <div class="how">
+      <div class="code-panel reveal in">
+        <div class="code-tabs" role="tablist">
+          <button class="code-tab active" data-lang="py" role="tab"><img src="assets/tech/python.png" alt="">Python</button>
+          <button class="code-tab" data-lang="js" role="tab"><img src="assets/tech/node.png" alt="">Node.js</button>
+          <button class="code-tab" data-lang="pwsh" role="tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>PowerShell</button>
+          <button class="code-tab" data-lang="http" role="tab"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>HTTP</button>
+        </div>
+        <div class="code-body" id="codeBody"><pre></pre></div>
+      </div>
+      <div class="steps reveal d1 in">
+        <div class="step">
+          <span class="sidx">01</span>
+          <div><h3>Create</h3><p>One profile is one identity: fingerprint seed, timezone, language, screen, proxy and behavior settings.</p></div>
+        </div>
+        <div class="step">
+          <span class="sidx">02</span>
+          <div><h3>Launch</h3><p>Start a real stealth Chromium window in one click. Cookies and history persist only inside that profile.</p></div>
+        </div>
+        <div class="step">
+          <span class="sidx">03</span>
+          <div><h3>Automate</h3><p>Drive it from the local API today; richer automation and an MCP server are on the roadmap.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="opensource">
+  <div class="section-inner">
+    <div class="oss oss-single">
+      <div class="reveal in">
+        <h2>Run it your way.</h2>
+        <p>ZenCloak is open source and fully yours. Download the installer or build from source. The engine and your profiles stay on your machine, with no lock-in.</p>
+        <div class="oss-actions">
+          <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.23.49-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.81.06 1.24.83 1.24.83.71 1.22 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
+            View on GitHub
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/jiabirc6/ZenCloak#readme">Read the docs</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta" id="cta">
+  <div class="cta-hands"><img src="assets/dot-matrix-hands.png" alt=""></div>
+  <div class="cta-mask"></div>
+  <div class="cta-inner">
+    <div class="cta-copy">
+      <h2 class="reveal in">Give your identities a<br>better browser.</h2>
+      <p class="reveal d1 in">Download ZenCloak, create a profile, and open a real, isolated Chromium window in under a minute.</p>
+      <div class="cta-actions reveal d2 in">
+        <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a>
+        <a class="btn btn-ghost" href="#how">See how it works</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a class="brand brand-lg" href="#top"><img class="mark" src="assets/logo.svg" alt=""> ZenCloak</a>
+      <p class="tagline">The open source fingerprint browser for Windows.</p>
+      <div class="footer-cta"><a class="btn btn-primary btn-sm" href="https://github.com/jiabirc6/ZenCloak/releases/latest">Download</a></div>
+    </div>
+    <pre class="footer-config" aria-label="Footer links"><span class="brace">{</span>
+  <span class="k">copyright</span><span class="p">:</span> <span class="s">"© 2026 ZenCloak. All rights reserved."</span><span class="p">,</span>
+  <span class="k">github</span><span class="p">:</span> <a class="s lnk" href="https://github.com/jiabirc6/ZenCloak">"/jiabirc6/ZenCloak"</a><span class="p">,</span>
+  <span class="k">docs</span><span class="p">:</span> <a class="s lnk" href="https://github.com/jiabirc6/ZenCloak#readme">"github.com/jiabirc6/ZenCloak#readme"</a><span class="p">,</span>
+  <span class="k">release</span><span class="p">:</span> <a class="s lnk" href="https://github.com/jiabirc6/ZenCloak/releases/latest">"releases/latest"</a><span class="p">,</span>
+  <span class="k">license</span><span class="p">:</span> <span class="s">"MIT"</span><span class="p">,</span>
+  <span class="k">design</span><span class="p">:</span> <a class="s lnk" href="https://github.com/h4ckf0r0day/obscura">"Obscura · Apache-2.0"</a>
+<span class="brace">}</span></pre>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+
+</body></html>

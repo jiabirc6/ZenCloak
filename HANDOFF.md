@@ -43,6 +43,7 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 ### 文档
 
+- `site/`：GitHub Pages 独立主页（obscura.sh 风格，Apache-2.0 改编），部署到 https://jiabirc6.github.io/ZenCloak/，About 链接已指向该站
 - `README.md`：项目介绍、下载安装、使用、FAQ
 - `docs/zencloak-tutorial.md`：新手教程
 - `docs/ROADMAP.md`：近期/中期/后期计划
