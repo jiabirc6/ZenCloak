@@ -193,6 +193,7 @@ class SessionManager:
             f"--fingerprint={profile['seed']}",
             f"--fingerprint-screen-width={profile['screen_width']}",
             f"--fingerprint-screen-height={profile['screen_height']}",
+            f"--lang={profile['locale']}",
         ]
         if profile.get("user_agent"):
             args.append(f"--user-agent={profile['user_agent']}")

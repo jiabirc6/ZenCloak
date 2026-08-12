@@ -111,6 +111,7 @@ def test_launch_passes_fingerprint_and_behavior_kwargs(tmp_path):
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     kwargs = contexts[0][0]
     assert "--fingerprint=12345" in kwargs["args"]
+    assert "--lang=zh-CN" in kwargs["args"]
     assert "Asia/Shanghai" in kwargs["timezone"]
     assert kwargs["locale"] == "zh-CN"
     assert kwargs["humanize"] is True

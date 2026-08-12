@@ -95,6 +95,16 @@ def test_ui_url_opener_sends_normalized_request():
                 assert page.locator("#openUrlInput").is_visible()
                 assert opens, f"open request missing: {recorded}"
                 assert '"url":"https://google.com"' in opens[0][2]
+                page.locator("#openUrlTranslateBtn").click()
+                page.wait_for_timeout(800)
+                translated = [
+                    r
+                    for r in recorded
+                    if r[0] == "POST"
+                    and "/open" in r[1]
+                    and "translate.google.com/translate" in r[2]
+                ]
+                assert translated, f"translate request missing: {recorded}"
                 browser.close()
         finally:
             proc.terminate()

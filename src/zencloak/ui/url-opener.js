@@ -31,8 +31,16 @@
     button.type = "button";
     button.innerHTML = '<i data-lucide="external-link"></i>打开';
 
+    const translateButton = document.createElement("button");
+    translateButton.id = "openUrlTranslateBtn";
+    translateButton.className = "btn";
+    translateButton.type = "button";
+    translateButton.title = "通过 Google 翻译打开为中文";
+    translateButton.innerHTML = '<i data-lucide="languages"></i>翻译';
+
     opener.appendChild(input);
     opener.appendChild(button);
+    opener.appendChild(translateButton);
     wrap.prepend(opener);
 
     opener.style.display = "flex";
@@ -53,7 +61,19 @@
       }
     }
 
+    function translate() {
+      const url = normalizeHttps(input.value);
+      if (!url) return;
+      const translated =
+        "https://translate.google.com/translate?sl=auto&tl=zh-CN&u=" +
+        encodeURIComponent(url);
+      if (typeof window.openDetectUrl === "function") {
+        window.openDetectUrl(translated);
+      }
+    }
+
     button.addEventListener("click", open);
+    translateButton.addEventListener("click", translate);
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") open();
     });
