@@ -107,5 +107,3 @@ UI 需要本地 API 才能读取档案。请始终通过 `dist\ZenCloak.exe` 或
 ## 许可
 
 本项目包装与客户端代码采用 MIT 许可，见 [LICENSE](LICENSE)。CloakBrowser 二进制使用其自身许可，详情见 [CloakBrowser BINARY-LICENSE](https://github.com/CloakHQ/CloakBrowser/blob/main/BINARY-LICENSE.md)。请仅将本工具用于合法、已获授权的场景。
-
-网站视觉基于 [Obscura](https://github.com/h4ckf0r0day/obscura)（Apache-2.0）的公开主页改编。

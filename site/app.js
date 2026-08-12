@@ -1,5 +1,5 @@
 /* ============================================================
-   ZENCLOAK - interactions (adapted from Obscura, Apache-2.0)
+   ZENCLOAK - interactions
    ============================================================ */
 (function () {
   "use strict";

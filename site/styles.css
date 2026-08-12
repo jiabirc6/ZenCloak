@@ -1,7 +1,7 @@
 @font-face{font-family:'Geist';src:url('fonts/Geist-Variable.woff2') format('woff2');font-weight:300 700;font-display:swap;}
 @font-face{font-family:'Geist Mono';src:url('fonts/GeistMono-Variable.woff2') format('woff2');font-weight:400 500;font-display:swap;}
 /* ============================================================
-   OBSCURA, monochrome browser-engine landing page
+   ZENCLOAK, monochrome browser landing page
    Geist / Geist Mono · sharp corners · pure black & white
    ============================================================ */
 
@@ -592,6 +592,27 @@ h1, h2, h3 { font-weight: 500; letter-spacing: -0.02em; color: var(--fg-strong);
 .footer-config .s { color: var(--fg-strong); }
 .footer-config a.lnk { color: var(--fg-strong); text-decoration: none; border-bottom: 1px solid var(--line-2); transition: border-color .15s, opacity .15s; }
 .footer-config a.lnk:hover { border-color: var(--white); }
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.footer-links a {
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+  transition: color .15s;
+}
+.footer-links a:hover { color: var(--fg-strong); }
+.footer-base {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 18px var(--pad) 56px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 13px;
+}
 @media (max-width: 760px) {
   .footer-config { justify-self: start; max-width: 100%; font-size: 12.5px; padding: 22px 20px; }
 }
