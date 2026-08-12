@@ -1,4 +1,5 @@
 import argparse
+import ctypes
 import socket
 import threading
 import time
@@ -32,6 +33,18 @@ def _wait_until_ready(url: str, timeout: float = 20.0) -> None:
     raise RuntimeError("ZenCloak 本地服务启动超时")
 
 
+def _show_already_running() -> None:
+    try:
+        ctypes.windll.user32.MessageBoxW(
+            None,
+            "ZenCloak 已在运行，请先关闭旧窗口再启动。",
+            "ZenCloak",
+            0x40,
+        )
+    except Exception:
+        pass
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="zencloak", description="ZenCloak 专属指纹浏览器")
     parser.add_argument("--data-dir", type=Path, default=Path.home() / ".zencloak")
@@ -45,6 +58,7 @@ def main(argv: list[str] | None = None) -> None:
 
     instance_lock = InstanceLock(args.data_dir / "zencloak.lock")
     if not instance_lock.acquire():
+        _show_already_running()
         raise SystemExit("ZenCloak 已在运行")
 
     store = ProfileStore(args.data_dir, auto_init=True)
