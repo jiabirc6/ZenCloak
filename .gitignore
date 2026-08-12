@@ -9,4 +9,5 @@ build/
 tmp-lucide/
 verify-shots/
 CloakBrowser-ref/
+obscura-ref/
 installer/*.exe
