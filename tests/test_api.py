@@ -179,6 +179,17 @@ def test_open_url_endpoint_requires_running_session(client):
     assert opened.status_code == 200
 
 
+def test_open_url_endpoint_rejects_non_http_scheme(client):
+    api_client, _, _ = client
+    profile = api_client.post("/api/profiles", json=_draft()).json()
+    api_client.post(f"/api/sessions/{profile['id']}/launch")
+    response = api_client.post(
+        f"/api/sessions/{profile['id']}/open",
+        json={"url": "file:///C:/Windows/win.ini"},
+    )
+    assert response.status_code == 400
+
+
 def test_engine_endpoint_returns_health_keys(client):
     api_client, _, _ = client
     response = api_client.get("/api/engine")

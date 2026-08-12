@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from zencloak.core.fingerprint import default_profile_draft
+from zencloak.core.models import normalize_start_url
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionError, SessionManager
 
@@ -19,7 +20,10 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
     app.state.sessions = sessions
 
     def profile_or_404(profile_id: str) -> dict:
-        profile = store.get_profile(profile_id)
+        try:
+            profile = store.get_profile(profile_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if profile is None:
             raise HTTPException(status_code=404, detail="档案不存在")
         return profile
@@ -60,7 +64,11 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
 
     @app.delete("/api/profiles/{profile_id}")
     def delete_profile(profile_id: str) -> Response:
-        if not store.delete_profile(profile_id):
+        try:
+            deleted = store.delete_profile(profile_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not deleted:
             raise HTTPException(status_code=404, detail="档案不存在")
         return Response(status_code=204)
 
@@ -105,7 +113,13 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
         if not isinstance(url, str) or not url.strip():
             raise HTTPException(status_code=400, detail="url 不能为空")
         try:
-            return sessions.open_url(profile_id, url.strip())
+            normalized = normalize_start_url(url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if normalized is None:
+            raise HTTPException(status_code=400, detail="url 不能为空")
+        try:
+            return sessions.open_url(profile_id, normalized)
         except SessionError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 

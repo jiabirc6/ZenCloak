@@ -7,7 +7,8 @@
   function normalizeHttps(value) {
     const trimmed = value.trim();
     if (!trimmed) return null;
-    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) return trimmed;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) return null;
     return defaultScheme(trimmed) + trimmed;
   }
 

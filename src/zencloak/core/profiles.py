@@ -46,7 +46,14 @@ class ProfileStore:
             self.create_profile(default_profile_draft())
 
     def _path(self, profile_id: str) -> Path:
-        return self.profiles_dir / f"{profile_id}.json"
+        return self._resolve_within(self.profiles_dir, f"{profile_id}.json")
+
+    def _resolve_within(self, root: Path, name: str) -> Path:
+        candidate = root / name
+        resolved = candidate.resolve()
+        if not resolved.is_relative_to(root.resolve()):
+            raise ValueError(f"非法档案 ID: {name!r}")
+        return resolved
 
     def _write(self, profile: dict) -> None:
         with self._path(profile["id"]).open("w", encoding="utf-8") as handle:
@@ -72,7 +79,7 @@ class ProfileStore:
     def create_profile(self, data: dict) -> dict:
         payload = {
             **data,
-            "id": data.get("id") or uuid.uuid4().hex[:12],
+            "id": uuid.uuid4().hex[:12],
             "created_at": _now_iso(),
             "updated_at": _now_iso(),
         }
@@ -104,4 +111,4 @@ class ProfileStore:
         return True
 
     def profile_data_dir(self, profile_id: str) -> Path:
-        return self.data_dir / profile_id
+        return self._resolve_within(self.data_dir, profile_id)

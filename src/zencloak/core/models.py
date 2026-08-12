@@ -1,5 +1,6 @@
 import re
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -26,8 +27,12 @@ def normalize_start_url(value: str | None) -> str | None:
     value = value.strip()
     if not value:
         return None
-    if not _SCHEME_RE.match(value):
-        value = _default_scheme(value) + value
+    if _SCHEME_RE.match(value):
+        parsed = urlsplit(value)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("仅支持 http/https URL")
+        return value
+    value = _default_scheme(value) + value
     return value
 
 
@@ -44,7 +49,7 @@ class ProxySettings(BaseModel):
 class Profile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(min_length=12, max_length=12)
+    id: str = Field(pattern=r"^[0-9a-f]{12}$")
     name: str = Field(min_length=1, max_length=32)
     color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
     notes: str = ""

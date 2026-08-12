@@ -22,6 +22,22 @@ def test_create_profile_persists_and_generates_id(store):
     assert store.get_profile(profile["id"]) == profile
 
 
+def test_create_profile_ignores_client_supplied_id(store):
+    profile = store.create_profile({**_draft(), "id": "..\\..\\..\\x"})
+    assert len(profile["id"]) == 12
+    assert all(c in "0123456789abcdef" for c in profile["id"])
+
+
+def test_rejects_traversal_profile_id_on_read(store):
+    with pytest.raises(ValueError):
+        store.get_profile("..\\..\\..\\x")
+
+
+def test_rejects_traversal_profile_id_on_delete(store):
+    with pytest.raises(ValueError):
+        store.delete_profile("..\\..\\..\\x")
+
+
 def test_list_profiles_returns_copies(store):
     first = store.create_profile(_draft("甲档案"))
     second = store.create_profile(_draft("乙档案"))
@@ -113,6 +129,11 @@ def test_start_url_loopback_uses_http(store):
 def test_empty_start_url_becomes_none(store):
     profile = store.create_profile({**_draft(), "start_url": "   "})
     assert store.get_profile(profile["id"])["start_url"] is None
+
+
+def test_start_url_rejects_file_scheme(store):
+    with pytest.raises(ValidationError):
+        store.create_profile({**_draft(), "start_url": "file:///C:/Windows/win.ini"})
 
 
 def test_proxy_password_is_encrypted_on_disk(store):

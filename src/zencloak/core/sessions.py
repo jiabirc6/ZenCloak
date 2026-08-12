@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from queue import Empty, Queue
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from cloakbrowser import launch_persistent_context
 
@@ -67,6 +68,9 @@ class SessionManager:
         }
 
     def open_url(self, profile_id: str, url: str) -> dict:
+        parsed = urlsplit(url)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise SessionError("仅支持 http/https URL")
         with self._lock:
             session = self._sessions.get(profile_id)
             if not session or session["status"] not in {"launching", "running"}:
