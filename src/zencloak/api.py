@@ -1,15 +1,14 @@
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
+from cloakbrowser.config import get_binary_path, get_effective_version
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from .core.fingerprint import default_profile_draft
-from .core.profiles import ProfileStore
-from .core.sessions import SessionError, SessionManager
+from zencloak.core.fingerprint import default_profile_draft
+from zencloak.core.profiles import ProfileStore
+from zencloak.core.sessions import SessionError, SessionManager
 
 UI_DIR = Path(__file__).parent / "ui"
 
@@ -121,28 +120,16 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
 
 def _engine_info() -> dict:
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "cloakbrowser", "info"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        if result.returncode != 0:
-            return {
-                "available": False,
-                "version": None,
-                "binary": None,
-                "error": result.stderr.strip() or result.stdout.strip(),
-            }
-        version = ""
-        binary = ""
-        for line in result.stdout.splitlines():
-            if line.lower().startswith("version:"):
-                version = line.split(":", 1)[1].strip()
-            if line.lower().startswith("binary:"):
-                binary = line.split(":", 1)[1].strip()
-        return {"available": True, "version": version, "binary": binary}
+        version = get_effective_version()
+        binary = get_binary_path(version)
+        if binary.exists():
+            return {"available": True, "version": version, "binary": str(binary)}
+        return {
+            "available": False,
+            "version": version,
+            "binary": None,
+            "error": "CloakBrowser 二进制尚未下载",
+        }
     except Exception as exc:  # noqa: BLE001 - engine status should never crash API
         return {
             "available": False,

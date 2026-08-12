@@ -9,10 +9,10 @@ from pathlib import Path
 import uvicorn
 import webview
 
-from .api import create_app
-from .core.lock import InstanceLock
-from .core.profiles import ProfileStore
-from .core.sessions import SessionManager
+from zencloak.api import create_app
+from zencloak.core.lock import InstanceLock
+from zencloak.core.profiles import ProfileStore
+from zencloak.core.sessions import SessionManager
 
 
 def _free_port() -> int:
