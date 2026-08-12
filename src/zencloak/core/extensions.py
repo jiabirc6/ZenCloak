@@ -1,67 +1,52 @@
-import html
 import json
 import shutil
-import uuid
 from pathlib import Path
 
 
-_EXTENSION_JS = """const redirect = document.getElementById("redirect");
-const url = redirect && redirect.getAttribute("data-url");
-if (url) {
-  location.replace(url);
-}
-"""
-
-
-def build_newtab_extension(
-    profile: dict, data_root: str | Path, dir_name: str | None = None
-) -> Path:
-    """Write a Chrome new-tab override extension that redirects to start_url."""
-    url = profile["start_url"]
-    dir_name = dir_name or f"newtab-{uuid.uuid4().hex[:10]}"
-    ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
-    ext_dir.mkdir(parents=True, exist_ok=True)
-
-    manifest = {
-        "manifest_version": 3,
-        "name": "ZenCloak New Tab",
-        "version": "1.0.0",
-        "description": "Open the profile start page in new tabs.",
-        "chrome_url_overrides": {"newtab": "newtab.html"},
-    }
-    (ext_dir / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-    escaped_url = html.escape(url, quote=True)
-    newtab_html = f"""<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<title>ZenCloak</title>
-</head>
-<body>
-<script id="redirect" data-url="{escaped_url}"></script>
-<script src="newtab.js"></script>
-</body>
-</html>"""
-    (ext_dir / "newtab.html").write_text(newtab_html, encoding="utf-8")
-    (ext_dir / "newtab.js").write_text(_EXTENSION_JS, encoding="utf-8")
-    return ext_dir
-
-
 def cleanup_stale_newtab_extensions(
-    profile: dict, data_root: str | Path, keep_dir: str = "newtab-v2"
+    profile: dict, data_root: str | Path, keep_dir: str = "__none__"
 ) -> None:
-    """Remove old generated new-tab extensions, keeping only the active one."""
+    """Remove generated new-tab extension directories from a profile."""
     ext_root = Path(data_root) / profile["id"] / "extensions"
     if not ext_root.exists():
         return
     for child in ext_root.iterdir():
-        if (
-            child.is_dir()
-            and child.name.startswith("newtab")
-            and child.name != keep_dir
-        ):
+        if child.is_dir() and child.name.startswith("newtab"):
+            if child.name == keep_dir:
+                continue
             shutil.rmtree(child, ignore_errors=True)
+
+
+def clean_newtab_extension_prefs(profile: dict, data_root: str | Path) -> None:
+    """Remove stale new-tab override registrations from Chrome Preferences."""
+    prefs_path = Path(data_root) / profile["id"] / "Default" / "Preferences"
+    if not prefs_path.exists():
+        return
+    try:
+        data = json.loads(prefs_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+
+    changed = False
+    extensions = data.get("extensions")
+    if not isinstance(extensions, dict):
+        return
+    overrides = extensions.get("chrome_url_overrides")
+    if isinstance(overrides, dict) and isinstance(overrides.get("newtab"), list):
+        if overrides["newtab"]:
+            overrides["newtab"] = []
+            changed = True
+    settings = extensions.get("settings")
+    if isinstance(settings, dict):
+        stale_ids = [
+            key
+            for key, value in settings.items()
+            if isinstance(value, dict) and "newtab" in str(value.get("path", ""))
+        ]
+        for key in stale_ids:
+            del settings[key]
+            changed = True
+    if changed:
+        prefs_path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )

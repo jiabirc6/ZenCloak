@@ -7,7 +7,10 @@ from typing import Any, Callable
 
 from cloakbrowser import launch_persistent_context
 
-from .extensions import cleanup_stale_newtab_extensions
+from .extensions import (
+    clean_newtab_extension_prefs,
+    cleanup_stale_newtab_extensions,
+)
 
 
 class SessionError(RuntimeError):
@@ -70,8 +73,13 @@ class SessionManager:
             session = self._sessions.get(profile_id)
             if not session or session["status"] not in {"launching", "running"}:
                 raise SessionError("档案未运行")
-            session["urls"].put(url)
-        return self.status(profile_id)
+            item = {"url": url, "event": threading.Event(), "opened": False}
+            session["urls"].put(item)
+        item["event"].wait(timeout=15)
+        result = self.status(profile_id)
+        if isinstance(result, dict):
+            result = {**result, "opened": item["opened"]}
+        return result
 
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
@@ -99,10 +107,11 @@ class SessionManager:
     def _open_urls_from_queue(self, context: Any, session: dict[str, Any]) -> None:
         while True:
             try:
-                url = session["urls"].get_nowait()
+                item = session["urls"].get_nowait()
             except Empty:
                 return
-            self._open_page(context, url)
+            item["opened"] = self._open_page(context, item["url"])
+            item["event"].set()
 
     def _prepare_start_page(self, context: Any, profile: dict) -> None:
         start_url = profile.get("start_url")
@@ -197,6 +206,7 @@ class SessionManager:
         cleanup_stale_newtab_extensions(
             profile, self.data_root, keep_dir="__none__"
         )
+        clean_newtab_extension_prefs(profile, self.data_root)
         proxy = profile.get("proxy")
         if proxy:
             proxy_dict = {
@@ -208,11 +218,12 @@ class SessionManager:
             kwargs["proxy"] = proxy_dict
         return kwargs
 
-    def _open_page(self, context: Any, url: str) -> None:
+    def _open_page(self, context: Any, url: str) -> bool:
         try:
             context.new_page().goto(url, timeout=60000)
+            return True
         except Exception:  # noqa: BLE001 - a dead page should not kill session
-            pass
+            return False
 
     def _close_safely(self, context: Any) -> None:
         try:

@@ -88,6 +88,7 @@ function renderProfileList() {
     const item = document.createElement("button");
     item.className = "profile-item" + (profile.id === state.selectedId ? " active" : "");
     item.type = "button";
+    item.dataset.profileId = profile.id;
     const status = statusOf(profile.id);
     item.innerHTML = `
       <span class="pcolor" style="background:${profile.color}"></span>
@@ -102,6 +103,16 @@ function renderProfileList() {
     : "未选择档案";
 }
 
+function updateProfileStatuses() {
+  for (const item of document.querySelectorAll(".profile-item")) {
+    const profileId = item.dataset.profileId;
+    if (!profileId) continue;
+    const status = statusOf(profileId);
+    const dot = item.querySelector(".pstatus");
+    if (dot) dot.className = "pstatus " + status.status;
+  }
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -111,11 +122,18 @@ function escapeHtml(value) {
 }
 
 function selectProfile(id) {
-  if (state.selectedId !== id) {
-    state.selectedId = id;
-    renderProfileList();
-    renderForm();
+  if (state.selectedId === id) {
+    loadSessions();
+    return;
   }
+  if (formDirty) {
+    const keep = window.confirm("当前档案有未保存的修改，确定放弃吗？");
+    if (!keep) return;
+    formDirty = false;
+  }
+  state.selectedId = id;
+  renderProfileList();
+  renderForm();
   loadSessions();
 }
 
@@ -191,7 +209,7 @@ async function loadSessions() {
   } catch (error) {
     return;
   }
-  renderProfileList();
+  updateProfileStatuses();
   renderSessionControls();
 }
 
@@ -331,15 +349,19 @@ async function openDetectUrl(url) {
   if (!state.selectedId) return;
   const session = statusOf(state.selectedId);
   if (session.status !== "running") {
-    toast("请先启动档案再打开检测站点", true);
+    toast("请先启动档案", true);
     return;
   }
   try {
-    await api(`/api/sessions/${state.selectedId}/open`, {
+    const result = await api(`/api/sessions/${state.selectedId}/open`, {
       method: "POST",
       body: JSON.stringify({ url }),
     });
-    toast("检测页面已打开");
+    if (result && result.opened === false) {
+      toast("页面打开失败", true);
+      return;
+    }
+    toast("页面已打开");
   } catch (error) {
     toast(error.message, true);
   }

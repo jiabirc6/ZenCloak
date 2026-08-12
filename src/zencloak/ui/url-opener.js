@@ -1,9 +1,14 @@
 (function () {
+  function defaultScheme(value) {
+    const host = value.split("/", 1)[0].split(":", 1)[0].toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" ? "http://" : "https://";
+  }
+
   function normalizeHttps(value) {
     const trimmed = value.trim();
     if (!trimmed) return null;
     if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) return trimmed;
-    return "https://" + trimmed;
+    return defaultScheme(trimmed) + trimmed;
   }
 
   function buildOpener() {

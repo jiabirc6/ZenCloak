@@ -6,10 +6,31 @@ from pathlib import Path
 
 from .fingerprint import default_profile_draft
 from .models import Profile
+from .secrets import decrypt_text, encrypt_text
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _serialize_profile(profile: dict) -> dict:
+    data = dict(profile)
+    proxy = data.get("proxy")
+    if proxy and proxy.get("password"):
+        data["proxy"] = {**proxy, "password": encrypt_text(proxy["password"])}
+    return data
+
+
+def _deserialize_profile(data: dict) -> dict:
+    profile = dict(data)
+    proxy = profile.get("proxy")
+    if proxy and proxy.get("password"):
+        try:
+            password = decrypt_text(proxy["password"])
+        except Exception:
+            password = proxy["password"]
+        profile["proxy"] = {**proxy, "password": password}
+    return profile
 
 
 class ProfileStore:
@@ -27,19 +48,26 @@ class ProfileStore:
     def _path(self, profile_id: str) -> Path:
         return self.profiles_dir / f"{profile_id}.json"
 
-    def list_profiles(self) -> list[dict]:
-        profiles = []
-        for path in sorted(self.profiles_dir.glob("*.json")):
-            with path.open("r", encoding="utf-8") as handle:
-                profiles.append(json.load(handle))
-        return sorted(profiles, key=lambda item: item["created_at"])
+    def _write(self, profile: dict) -> None:
+        with self._path(profile["id"]).open("w", encoding="utf-8") as handle:
+            json.dump(_serialize_profile(profile), handle, ensure_ascii=False, indent=2)
 
-    def get_profile(self, profile_id: str) -> dict | None:
+    def _read(self, profile_id: str) -> dict | None:
         path = self._path(profile_id)
         if not path.exists():
             return None
         with path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+            return _deserialize_profile(json.load(handle))
+
+    def list_profiles(self) -> list[dict]:
+        profiles = []
+        for path in sorted(self.profiles_dir.glob("*.json")):
+            with path.open("r", encoding="utf-8") as handle:
+                profiles.append(_deserialize_profile(json.load(handle)))
+        return sorted(profiles, key=lambda item: item["created_at"])
+
+    def get_profile(self, profile_id: str) -> dict | None:
+        return self._read(profile_id)
 
     def create_profile(self, data: dict) -> dict:
         payload = {
@@ -49,8 +77,7 @@ class ProfileStore:
             "updated_at": _now_iso(),
         }
         profile = Profile.model_validate(payload).model_dump()
-        with self._path(profile["id"]).open("w", encoding="utf-8") as handle:
-            json.dump(profile, handle, ensure_ascii=False, indent=2)
+        self._write(profile)
         return profile
 
     def update_profile(self, profile_id: str, data: dict) -> dict | None:
@@ -65,8 +92,7 @@ class ProfileStore:
             "updated_at": _now_iso(),
         }
         profile = Profile.model_validate(payload).model_dump()
-        with self._path(profile_id).open("w", encoding="utf-8") as handle:
-            json.dump(profile, handle, ensure_ascii=False, indent=2)
+        self._write(profile)
         return profile
 
     def delete_profile(self, profile_id: str) -> bool:

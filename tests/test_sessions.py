@@ -11,8 +11,11 @@ class FakePage:
         self.url = url
         self.urls = []
         self.closed = False
+        self.fail_on = None
 
     def goto(self, url, **_):
+        if url == self.fail_on:
+            raise RuntimeError("goto failed")
         self.url = url
         self.urls.append(url)
 
@@ -34,9 +37,11 @@ class FakeContext:
         self.page = None
         self.pages = [FakePage("about:blank")]
         self.closed = False
+        self.fail_on = None
 
     def new_page(self):
         page = FakePage()
+        page.fail_on = self.fail_on
         self.pages.append(page)
         if self.page is None:
             self.page = page
@@ -158,8 +163,18 @@ def test_open_url_after_running_opens_new_page(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
-    manager.open_url("aaaaaaaaaaaa", "https://detect.example")
+    result = manager.open_url("aaaaaaaaaaaa", "https://detect.example")
     _wait_url(contexts[0][1], "https://detect.example")
+    assert result["opened"] is True
+
+
+def test_open_url_reports_failure_when_goto_fails(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    contexts[0][1].fail_on = "https://broken.example"
+    result = manager.open_url("aaaaaaaaaaaa", "https://broken.example")
+    assert result["opened"] is False
 
 
 def test_open_url_when_stopped_raises(tmp_path):

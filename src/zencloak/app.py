@@ -9,6 +9,7 @@ import uvicorn
 import webview
 
 from .api import create_app
+from .core.lock import InstanceLock
 from .core.profiles import ProfileStore
 from .core.sessions import SessionManager
 
@@ -42,6 +43,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
+    instance_lock = InstanceLock(args.data_dir / "zencloak.lock")
+    if not instance_lock.acquire():
+        raise SystemExit("ZenCloak 已在运行")
+
     store = ProfileStore(args.data_dir, auto_init=True)
     sessions = SessionManager(data_root=store.data_dir)
     app = create_app(store, sessions)
@@ -74,6 +79,7 @@ def main(argv: list[str] | None = None) -> None:
         sessions.stop_all()
         server.should_exit = True
         thread.join(timeout=5)
+        instance_lock.release()
 
 
 if __name__ == "__main__":

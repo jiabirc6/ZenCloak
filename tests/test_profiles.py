@@ -100,6 +100,35 @@ def test_start_url_with_http_scheme_kept(store):
     assert store.get_profile(profile["id"])["start_url"] == "http://example.com"
 
 
+def test_start_url_localhost_uses_http(store):
+    profile = store.create_profile({**_draft(), "start_url": "localhost:8080"})
+    assert store.get_profile(profile["id"])["start_url"] == "http://localhost:8080"
+
+
+def test_start_url_loopback_uses_http(store):
+    profile = store.create_profile({**_draft(), "start_url": "127.0.0.1:5666"})
+    assert store.get_profile(profile["id"])["start_url"] == "http://127.0.0.1:5666"
+
+
 def test_empty_start_url_becomes_none(store):
     profile = store.create_profile({**_draft(), "start_url": "   "})
     assert store.get_profile(profile["id"])["start_url"] is None
+
+
+def test_proxy_password_is_encrypted_on_disk(store):
+    profile = store.create_profile(
+        {
+            **_draft(),
+            "proxy": {
+                "type": "http",
+                "host": "proxy.example",
+                "port": 8080,
+                "username": "user",
+                "password": "secret",
+            },
+        }
+    )
+    raw = store._path(profile["id"]).read_text(encoding="utf-8")
+    assert "secret" not in raw
+    loaded = store.get_profile(profile["id"])
+    assert loaded["proxy"]["password"] == "secret"

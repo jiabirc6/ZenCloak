@@ -11,6 +11,13 @@ from .fingerprint import (
 )
 
 _SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
+_LOCAL_HOSTS = {"localhost", "127.0.0.1"}
+
+
+def _default_scheme(value: str) -> str:
+    host_part = value.split("/", 1)[0]
+    host = host_part.split(":", 1)[0].lower()
+    return "http://" if host in _LOCAL_HOSTS else "https://"
 
 
 def normalize_start_url(value: str | None) -> str | None:
@@ -20,7 +27,7 @@ def normalize_start_url(value: str | None) -> str | None:
     if not value:
         return None
     if not _SCHEME_RE.match(value):
-        value = "https://" + value
+        value = _default_scheme(value) + value
     return value
 
 

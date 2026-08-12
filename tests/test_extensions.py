@@ -1,43 +1,42 @@
+import json
+
 from zencloak.core.extensions import (
-    build_newtab_extension,
+    clean_newtab_extension_prefs,
     cleanup_stale_newtab_extensions,
 )
 
 
-def test_newtab_html_uses_external_redirect_script(tmp_path):
-    profile = {"id": "aaaaaaaaaaaa", "start_url": "https://example.com/path?q=1"}
-    ext_dir = build_newtab_extension(profile, tmp_path)
-    html = (ext_dir / "newtab.html").read_text(encoding="utf-8")
-    js = (ext_dir / "newtab.js").read_text(encoding="utf-8")
-    assert 'src="newtab.js"' in html
-    assert "https://example.com/path?q=1" in html
-    assert "location.replace" in js
-    assert "setInterval" not in js
-
-
-def test_newtab_html_escapes_url_in_attribute(tmp_path):
-    profile = {"id": "bbbbbbbbbbbb", "start_url": "https://example.com/?a=1&b=2"}
-    ext_dir = build_newtab_extension(profile, tmp_path)
-    html = (ext_dir / "newtab.html").read_text(encoding="utf-8")
-    assert "&amp;" in html
-
-
-def test_newtab_extension_has_no_background_worker(tmp_path):
-    profile = {"id": "cccccccccccc", "start_url": "https://example.com"}
-    ext_dir = build_newtab_extension(profile, tmp_path)
-    manifest = (ext_dir / "manifest.json").read_text(encoding="utf-8")
-    assert "background" not in manifest
-    assert "permissions" not in manifest
-    assert not (ext_dir / "background.js").exists()
-
-
-def test_cleanup_keeps_only_current_newtab_extension(tmp_path):
-    profile = {"id": "dddddddddddd", "start_url": "https://example.com"}
+def test_cleanup_removes_all_old_newtab_dirs(tmp_path):
+    profile = {"id": "aaaaaaaaaaaa", "start_url": "https://example.com"}
     ext_root = tmp_path / profile["id"] / "extensions"
     (ext_root / "newtab").mkdir(parents=True)
-    (ext_root / "newtab-abc123").mkdir(parents=True)
-    current = build_newtab_extension(profile, tmp_path, dir_name="newtab-v2")
-    cleanup_stale_newtab_extensions(profile, tmp_path, keep_dir="newtab-v2")
-    remaining = sorted(p.name for p in ext_root.iterdir())
-    assert remaining == ["newtab-v2"]
-    assert current.exists()
+    (ext_root / "newtab-v2").mkdir(parents=True)
+    (ext_root / "other").mkdir()
+    cleanup_stale_newtab_extensions(profile, tmp_path, keep_dir="__none__")
+    assert [p.name for p in ext_root.iterdir()] == ["other"]
+
+
+def test_clean_prefs_removes_newtab_override_and_settings(tmp_path):
+    profile = {"id": "bbbbbbbbbbbb", "start_url": "https://example.com"}
+    prefs_dir = tmp_path / profile["id"] / "Default"
+    prefs_dir.mkdir(parents=True)
+    prefs_path = prefs_dir / "Preferences"
+    prefs_path.write_text(
+        json.dumps(
+            {
+                "extensions": {
+                    "chrome_url_overrides": {
+                        "newtab": [{"active": True, "entry": "chrome-extension://abc/newtab.html"}]
+                    },
+                    "settings": {
+                        "abc": {"path": str(tmp_path / profile["id"] / "extensions" / "newtab-v2")}
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    clean_newtab_extension_prefs(profile, tmp_path)
+    data = json.loads(prefs_path.read_text(encoding="utf-8"))
+    assert data["extensions"]["chrome_url_overrides"]["newtab"] == []
+    assert "abc" not in data["extensions"]["settings"]
