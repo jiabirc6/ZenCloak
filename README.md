@@ -6,6 +6,12 @@
 
 ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实 Chromium 窗口。
 
+## 下载安装
+
+最新安装包：[ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
+
+下载 `ZenCloak-Setup-*.exe` 后双击安装即可，无需管理员权限。首次启动浏览器档案时，若本机没有 CloakBrowser 内核，ZenCloak 会自动下载约 200MB 的 stealth Chromium 二进制并缓存在 `~/.cloakbrowser/`。
+
 ## 特性
 
 - 多指纹档案：指纹种子、时区、语言、屏幕、CPU 核数、设备内存、User-Agent
