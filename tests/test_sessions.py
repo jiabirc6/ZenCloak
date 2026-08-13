@@ -135,6 +135,24 @@ def test_launch_keeps_browser_ui_chinese_for_any_locale(tmp_path):
     assert "locale" not in kwargs
 
 
+def test_launch_re_enables_translate_feature(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    args = contexts[0][0]["args"]
+    assert "--enable-features=Translate" in args
+    disable = next(
+        arg for arg in args if arg.startswith("--disable-features=")
+    )
+    assert ",Translate" not in disable
+    import cloakbrowser.browser as cloak_browser
+
+    assert any(
+        "--disable-features=" in arg and "Translate" in arg
+        for arg in cloak_browser.IGNORE_DEFAULT_ARGS
+    )
+
+
 def test_launch_builds_proxy_dict(tmp_path):
     manager, contexts = _manager(tmp_path)
     profile = _profile()

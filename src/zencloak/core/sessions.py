@@ -6,6 +6,7 @@ from queue import Empty, Queue
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
+import cloakbrowser.browser as _cloakbrowser_browser
 from cloakbrowser import launch_persistent_context
 
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
@@ -17,6 +18,41 @@ class SessionError(RuntimeError):
 
 _BLANK_URLS = ("about:blank", "chrome://newtab", "chrome://newtab/")
 _NEWTAB_EXTENSION_DIR = "newtab-v3"
+
+# Playwright injects Translate into its default --disable-features list,
+# which overrides --enable-features=Translate. Ignore that default arg and
+# re-supply the same list without Translate so browser translation works.
+# Keep this list in sync with the installed Playwright version if it changes.
+_PLAYWRIGHT_DEFAULT_DISABLE_FEATURES = (
+    "AvoidUnnecessaryBeforeUnloadCheckSync,"
+    "BoundaryEventDispatchTracksNodeRemoval,"
+    "DestroyProfileOnBrowserClose,"
+    "DialMediaRouteProvider,"
+    "GlobalMediaControls,"
+    "HttpsUpgrades,"
+    "LensOverlay,"
+    "MediaRouter,"
+    "PaintHolding,"
+    "ThirdPartyStoragePartitioning,"
+    "Translate,"
+    "AutoDeElevate,"
+    "RenderDocument,"
+    "OptimizationHints,"
+    "msForceBrowserSignIn,"
+    "msEdgeUpdateLaunchServicesPreferredVersion"
+)
+_DISABLE_FEATURES_WITHOUT_TRANSLATE = _PLAYWRIGHT_DEFAULT_DISABLE_FEATURES.replace(
+    ",Translate", ""
+)
+
+if (
+    f"--disable-features={_PLAYWRIGHT_DEFAULT_DISABLE_FEATURES}"
+    not in _cloakbrowser_browser.IGNORE_DEFAULT_ARGS
+):
+    _cloakbrowser_browser.IGNORE_DEFAULT_ARGS = [
+        *_cloakbrowser_browser.IGNORE_DEFAULT_ARGS,
+        f"--disable-features={_PLAYWRIGHT_DEFAULT_DISABLE_FEATURES}",
+    ]
 
 
 def _now_iso() -> str:
@@ -196,6 +232,7 @@ class SessionManager:
             f"--fingerprint-screen-height={profile['screen_height']}",
             "--lang=zh-CN",
             f"--fingerprint-locale={profile['locale']}",
+            f"--disable-features={_DISABLE_FEATURES_WITHOUT_TRANSLATE}",
             "--enable-features=Translate",
         ]
         if profile.get("user_agent"):
