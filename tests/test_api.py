@@ -64,7 +64,9 @@ class FakeSessions:
 def client(tmp_path):
     store = ProfileStore(tmp_path, auto_init=True)
     sessions = FakeSessions()
-    return TestClient(create_app(store, sessions)), store, sessions
+    api_client = TestClient(create_app(store, sessions, api_token="test-token"))
+    api_client.headers.update({"Authorization": "Bearer test-token"})
+    return api_client, store, sessions
 
 
 def _draft(name="新档案"):
@@ -196,3 +198,91 @@ def test_engine_endpoint_returns_health_keys(client):
     assert response.status_code == 200
     assert "available" in response.json()
     assert "version" in response.json()
+
+
+def test_health_does_not_require_token(client):
+    api_client, _, _ = client
+    response = api_client.get("/api/health")
+    assert response.status_code == 200
+
+
+def test_api_requires_token(client):
+    api_client, _, _ = client
+    response = api_client.get("/api/profiles", headers={"Authorization": ""})
+    assert response.status_code == 401
+
+
+def test_export_import_roundtrip(client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft("导出档案")).json()
+    exported = api_client.get(f"/api/profiles/{created['id']}/export")
+    assert exported.status_code == 200
+    data = exported.json()
+    assert data["id"] == created["id"]
+    imported = api_client.post("/api/profiles/import", json=data)
+    assert imported.status_code == 200
+    imported_profile = imported.json()
+    assert imported_profile["id"] != created["id"]
+    assert imported_profile["name"] == created["name"]
+
+
+def test_duplicate_profile(client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft("原档案")).json()
+    duplicated = api_client.post(f"/api/profiles/{created['id']}/duplicate")
+    assert duplicated.status_code == 200
+    copy = duplicated.json()
+    assert copy["id"] != created["id"]
+    assert copy["name"] == "原档案 副本"
+
+
+def test_delete_moves_profile_to_recycle_bin(client):
+    api_client, store, _ = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    data_dir = store.profile_data_dir(created["id"])
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "cookies").write_text("x", encoding="utf-8")
+    assert api_client.delete(f"/api/profiles/{created['id']}").status_code == 204
+    assert api_client.get(f"/api/profiles/{created['id']}").status_code == 404
+    recycled = api_client.get("/api/recycle-bin").json()
+    assert [p["id"] for p in recycled] == [created["id"]]
+    restored = api_client.post(f"/api/recycle-bin/{created['id']}/restore")
+    assert restored.status_code == 200
+    assert api_client.get(f"/api/profiles/{created['id']}").status_code == 200
+    assert store.profile_data_dir(created["id"]).exists()
+
+
+def test_recycle_bin_permanent_delete(client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    api_client.delete(f"/api/profiles/{created['id']}")
+    assert (
+        api_client.delete(f"/api/recycle-bin/{created['id']}").status_code == 204
+    )
+    assert api_client.get("/api/recycle-bin").json() == []
+
+
+def test_batch_launch_and_stop(client):
+    api_client, _, _ = client
+    first = api_client.post("/api/profiles", json=_draft("甲")).json()
+    second = api_client.post("/api/profiles", json=_draft("乙")).json()
+    launched = api_client.post(
+        "/api/sessions/batch-launch",
+        json={"ids": [first["id"], second["id"]]},
+    )
+    assert launched.status_code == 200
+    assert all(item["ok"] for item in launched.json())
+    stopped = api_client.post(
+        "/api/sessions/batch-stop",
+        json={"ids": [first["id"], second["id"]]},
+    )
+    assert stopped.status_code == 200
+    assert all(item["ok"] for item in stopped.json())
+
+
+def test_batch_launch_reports_missing_profile(client):
+    api_client, _, _ = client
+    results = api_client.post(
+        "/api/sessions/batch-launch", json={"ids": ["missingprofile"]}
+    ).json()
+    assert results[0]["ok"] is False

@@ -62,7 +62,7 @@ def test_update_missing_profile_returns_none(store):
     assert store.update_profile("missing", _draft()) is None
 
 
-def test_delete_profile_removes_file_and_data_dir(store):
+def test_delete_profile_moves_file_and_data_to_recycle_bin(store):
     profile = store.create_profile(_draft())
     data_dir = store.profile_data_dir(profile["id"])
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -70,10 +70,36 @@ def test_delete_profile_removes_file_and_data_dir(store):
     assert store.delete_profile(profile["id"]) is True
     assert store.get_profile(profile["id"]) is None
     assert not data_dir.exists()
+    recycled = store.list_recycle_bin()
+    assert [p["id"] for p in recycled] == [profile["id"]]
+    restored = store.restore_profile(profile["id"])
+    assert restored is not None
+    assert store.get_profile(profile["id"])["name"] == profile["name"]
+    assert store.profile_data_dir(profile["id"]).exists()
 
 
 def test_delete_missing_profile_returns_false(store):
     assert store.delete_profile("missing") is False
+
+
+def test_restore_missing_recycle_item_returns_none(store):
+    assert store.restore_profile("missingprofile") is None
+
+
+def test_permanent_delete_removes_recycle_item(store):
+    profile = store.create_profile(_draft())
+    store.delete_profile(profile["id"])
+    assert store.permanent_delete_profile(profile["id"]) is True
+    assert store.list_recycle_bin() == []
+
+
+def test_duplicate_profile_creates_copy(store):
+    profile = store.create_profile(_draft("工作号"))
+    duplicate = store.duplicate_profile(profile["id"])
+    assert duplicate is not None
+    assert duplicate["id"] != profile["id"]
+    assert duplicate["name"] == "工作号 副本"
+    assert store.get_profile(duplicate["id"]) is not None
 
 
 def test_auto_init_creates_default_profile(tmp_path):

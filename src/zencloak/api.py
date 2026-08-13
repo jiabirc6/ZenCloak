@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Any
 
 from cloakbrowser.config import get_binary_path, get_effective_version
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from zencloak.core.fingerprint import default_profile_draft
@@ -14,10 +14,26 @@ from zencloak.core.sessions import SessionError, SessionManager
 UI_DIR = Path(__file__).parent / "ui"
 
 
-def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
+def create_app(
+    store: ProfileStore,
+    sessions: SessionManager,
+    api_token: str | None = None,
+) -> FastAPI:
     app = FastAPI(title="ZenCloak", version="0.1.0")
     app.state.store = store
     app.state.sessions = sessions
+
+    @app.middleware("http")
+    async def require_api_token(request: Request, call_next):
+        if api_token is None:
+            return await call_next(request)
+        if not request.url.path.startswith("/api/") or request.method == "OPTIONS":
+            return await call_next(request)
+        if request.url.path == "/api/health":
+            return await call_next(request)
+        if request.headers.get("authorization") != f"Bearer {api_token}":
+            return JSONResponse(status_code=401, content={"detail": "未授权"})
+        return await call_next(request)
 
     def profile_or_404(profile_id: str) -> dict:
         try:
@@ -47,9 +63,31 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/profiles/import")
+    def import_profile(payload: dict[str, Any]) -> dict:
+        try:
+            return store.create_profile(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/profiles/{profile_id}")
     def get_profile(profile_id: str) -> dict:
         return profile_or_404(profile_id)
+
+    @app.get("/api/profiles/{profile_id}/export")
+    def export_profile(profile_id: str) -> dict:
+        return profile_or_404(profile_id)
+
+    @app.post("/api/profiles/{profile_id}/duplicate")
+    def duplicate_profile(profile_id: str) -> dict:
+        profile_or_404(profile_id)
+        try:
+            duplicated = store.duplicate_profile(profile_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if duplicated is None:
+            raise HTTPException(status_code=404, detail="档案不存在")
+        return duplicated
 
     @app.put("/api/profiles/{profile_id}")
     def update_profile(profile_id: str, payload: dict[str, Any]) -> dict:
@@ -70,6 +108,30 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if not deleted:
             raise HTTPException(status_code=404, detail="档案不存在")
+        return Response(status_code=204)
+
+    @app.get("/api/recycle-bin")
+    def list_recycle_bin() -> list[dict]:
+        return store.list_recycle_bin()
+
+    @app.post("/api/recycle-bin/{profile_id}/restore")
+    def restore_profile(profile_id: str) -> dict:
+        try:
+            restored = store.restore_profile(profile_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if restored is None:
+            raise HTTPException(status_code=404, detail="回收站中没有该档案")
+        return restored
+
+    @app.delete("/api/recycle-bin/{profile_id}")
+    def permanent_delete_profile(profile_id: str) -> Response:
+        try:
+            deleted = store.permanent_delete_profile(profile_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not deleted:
+            raise HTTPException(status_code=404, detail="回收站中没有该档案")
         return Response(status_code=204)
 
     @app.get("/api/sessions")
@@ -105,6 +167,40 @@ def create_app(store: ProfileStore, sessions: SessionManager) -> FastAPI:
     def stop_session(profile_id: str) -> dict:
         profile_or_404(profile_id)
         return sessions.stop(profile_id)
+
+    @app.post("/api/sessions/batch-launch")
+    def batch_launch(payload: dict[str, Any]) -> list[dict]:
+        results: list[dict] = []
+        for profile_id in payload.get("ids") or []:
+            try:
+                profile = profile_or_404(profile_id)
+                results.append(
+                    {"profile_id": profile_id, "ok": True, **sessions.launch(profile)}
+                )
+            except HTTPException as exc:
+                results.append(
+                    {"profile_id": profile_id, "ok": False, "error": str(exc.detail)}
+                )
+            except SessionError as exc:
+                results.append({"profile_id": profile_id, "ok": False, "error": str(exc)})
+        return results
+
+    @app.post("/api/sessions/batch-stop")
+    def batch_stop(payload: dict[str, Any]) -> list[dict]:
+        results: list[dict] = []
+        for profile_id in payload.get("ids") or []:
+            try:
+                profile_or_404(profile_id)
+                results.append(
+                    {"profile_id": profile_id, "ok": True, **sessions.stop(profile_id)}
+                )
+            except HTTPException as exc:
+                results.append(
+                    {"profile_id": profile_id, "ok": False, "error": str(exc.detail)}
+                )
+            except SessionError as exc:
+                results.append({"profile_id": profile_id, "ok": False, "error": str(exc)})
+        return results
 
     @app.post("/api/sessions/{profile_id}/open")
     def open_session_url(profile_id: str, payload: dict[str, Any]) -> dict:

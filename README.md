@@ -52,6 +52,8 @@ python -m zencloak
 
 > 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。单文件 EXE 首次启动需要解压依赖，通常会等待 20 秒左右。
 
+如果觉得单文件 EXE 启动慢，可以按 [docs/packaging.md](docs/packaging.md) 构建 onedir 快速启动版（约 1-2 秒启动）。
+
 ## 使用
 
 1. 首次启动后，左侧默认出现「本地档案」。

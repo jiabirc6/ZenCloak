@@ -14,15 +14,42 @@ const state = {
   selectedId: null,
   selectedColor: PALETTE[0],
   engine: { available: false, version: null },
+  selectedIds: new Set(),
 };
 
 const $ = (id) => document.getElementById(id);
 
 let formDirty = false;
+let apiTokenPromise = null;
+
+function getApiToken() {
+  if (!apiTokenPromise) {
+    apiTokenPromise = (async () => {
+      try {
+        if (
+          window.pywebview &&
+          window.pywebview.api &&
+          typeof window.pywebview.api.get_api_token === "function"
+        ) {
+          return await window.pywebview.api.get_api_token();
+        }
+      } catch (error) {
+        // fall through to localStorage for headless/browser testing
+      }
+      return localStorage.getItem("zencloak_api_token") || "";
+    })();
+  }
+  return apiTokenPromise;
+}
 
 async function api(path, options = {}) {
+  const token = await getApiToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...options,
   });
   if (response.status === 204) return null;
@@ -74,6 +101,11 @@ async function loadEngine() {
 
 async function loadProfiles() {
   state.profiles = await api("/api/profiles");
+  const activeIds = new Set(state.profiles.map((p) => p.id));
+  for (const id of state.selectedIds) {
+    if (!activeIds.has(id)) state.selectedIds.delete(id);
+  }
+  updateBatchButtons();
   if (!state.selectedId || !state.profiles.some((p) => p.id === state.selectedId)) {
     state.selectedId = state.profiles[0] ? state.profiles[0].id : null;
   }
@@ -91,16 +123,34 @@ function renderProfileList() {
     item.dataset.profileId = profile.id;
     const status = statusOf(profile.id);
     item.innerHTML = `
+      <input type="checkbox" class="profile-check" data-profile-id="${profile.id}" aria-label="选择档案">
       <span class="pcolor" style="background:${profile.color}"></span>
       <span class="pname">${escapeHtml(profile.name)}<small>指纹 ${profile.seed}</small></span>
       <span class="pstatus ${status.status}"></span>
     `;
+    const check = item.querySelector(".profile-check");
+    check.checked = state.selectedIds.has(profile.id);
+    check.addEventListener("click", (event) => event.stopPropagation());
+    check.addEventListener("change", () => {
+      if (check.checked) {
+        state.selectedIds.add(profile.id);
+      } else {
+        state.selectedIds.delete(profile.id);
+      }
+      updateBatchButtons();
+    });
     item.addEventListener("click", () => selectProfile(profile.id));
     list.appendChild(item);
   }
   $("profileTitle").textContent = state.selectedId
     ? state.profiles.find((p) => p.id === state.selectedId)?.name || "未选择档案"
     : "未选择档案";
+}
+
+function updateBatchButtons() {
+  const hasSelection = state.selectedIds.size > 0;
+  $("batchLaunchBtn").disabled = !hasSelection;
+  $("batchStopBtn").disabled = !hasSelection;
 }
 
 function updateProfileStatuses() {
@@ -144,6 +194,8 @@ function renderForm() {
   $("launchBtn").disabled = !hasProfile;
   $("deleteBtn").disabled = !hasProfile;
   $("stopBtn").disabled = true;
+  $("duplicateBtn").disabled = !hasProfile;
+  $("exportBtn").disabled = !hasProfile;
   if (!profile) {
     $("profileForm").reset();
     $("colorPicker").innerHTML = "";
@@ -307,13 +359,192 @@ async function saveProfile() {
 async function deleteProfile() {
   if (!state.selectedId) return;
   const profile = state.profiles.find((p) => p.id === state.selectedId);
-  if (!window.confirm(`删除档案「${profile ? profile.name : ""}」？`)) return;
+  if (!window.confirm(`将档案「${profile ? profile.name : ""}」移入回收站？`)) return;
   try {
     await api(`/api/profiles/${state.selectedId}`, { method: "DELETE" });
     state.selectedId = null;
     await loadProfiles();
     await loadSessions();
-    toast("档案已删除");
+    toast("档案已移入回收站");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function duplicateProfile() {
+  if (!state.selectedId) return;
+  try {
+    const duplicated = await api(`/api/profiles/${state.selectedId}/duplicate`, {
+      method: "POST",
+    });
+    state.selectedId = duplicated.id;
+    await loadProfiles();
+    await loadSessions();
+    toast("已复制档案");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+function safeFileName(name) {
+  return String(name || "profile").replace(/[\\/:*?"<>|]/g, "-");
+}
+
+async function exportProfile() {
+  if (!state.selectedId) return;
+  try {
+    const data = await api(`/api/profiles/${state.selectedId}/export`);
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `zencloak-${safeFileName(data.name)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    toast("档案已导出");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+function pickImportFile() {
+  $("importFile").click();
+}
+
+async function importProfileFromFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const created = await api("/api/profiles/import", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    state.selectedId = created.id;
+    await loadProfiles();
+    await loadSessions();
+    toast("档案已导入");
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    event.target.value = "";
+  }
+}
+
+async function batchLaunch() {
+  const ids = Array.from(state.selectedIds);
+  if (!ids.length) return;
+  try {
+    const results = await api("/api/sessions/batch-launch", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    });
+    const failed = results.filter((item) => !item.ok);
+    toast(failed.length ? `${failed.length} 个档案启动失败` : "已批量启动");
+    await loadSessions();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function batchStop() {
+  const ids = Array.from(state.selectedIds);
+  if (!ids.length) return;
+  try {
+    const results = await api("/api/sessions/batch-stop", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    });
+    const failed = results.filter((item) => !item.ok);
+    toast(failed.length ? `${failed.length} 个档案停止失败` : "已批量停止");
+    await loadSessions();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+async function showRecycleBin() {
+  $("recycleView").hidden = false;
+  document.querySelector(".panel").hidden = true;
+  document.querySelector(".detect-wrap").hidden = true;
+  document.querySelector(".toolbar").hidden = true;
+  await loadRecycleBin();
+}
+
+function hideRecycleBin() {
+  $("recycleView").hidden = true;
+  document.querySelector(".panel").hidden = false;
+  document.querySelector(".detect-wrap").hidden = false;
+  document.querySelector(".toolbar").hidden = false;
+}
+
+async function loadRecycleBin() {
+  try {
+    const items = await api("/api/recycle-bin");
+    const list = $("recycleList");
+    list.innerHTML = "";
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "recycle-empty";
+      empty.textContent = "回收站是空的";
+      list.appendChild(empty);
+      return;
+    }
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.className = "recycle-item";
+      row.innerHTML = `
+        <div class="recycle-info">
+          <strong>${escapeHtml(item.name)}</strong>
+          <small>${escapeHtml(formatDateTime(item.deleted_at))}</small>
+        </div>
+        <div class="recycle-actions">
+          <button class="btn" type="button" data-action="restore"><i data-lucide="rotate-ccw"></i>恢复</button>
+          <button class="btn danger" type="button" data-action="delete"><i data-lucide="trash-2"></i>永久删除</button>
+        </div>
+      `;
+      row
+        .querySelector('[data-action="restore"]')
+        .addEventListener("click", () => restoreProfile(item.id));
+      row
+        .querySelector('[data-action="delete"]')
+        .addEventListener("click", () => permanentDeleteProfile(item.id));
+      list.appendChild(row);
+    }
+    if (window.lucide) window.lucide.createIcons();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function restoreProfile(profileId) {
+  try {
+    await api(`/api/recycle-bin/${profileId}/restore`, { method: "POST" });
+    toast("已恢复档案");
+    await loadRecycleBin();
+    await loadProfiles();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function permanentDeleteProfile(profileId) {
+  if (!window.confirm("永久删除后无法恢复，确定吗？")) return;
+  try {
+    await api(`/api/recycle-bin/${profileId}`, { method: "DELETE" });
+    toast("已永久删除");
+    await loadRecycleBin();
   } catch (error) {
     toast(error.message, true);
   }
@@ -377,6 +608,14 @@ function bindEvents() {
   $("launchBtn").addEventListener("click", launchProfile);
   $("stopBtn").addEventListener("click", stopProfile);
   $("deleteBtn").addEventListener("click", deleteProfile);
+  $("duplicateBtn").addEventListener("click", duplicateProfile);
+  $("exportBtn").addEventListener("click", exportProfile);
+  $("importProfileBtn").addEventListener("click", pickImportFile);
+  $("importFile").addEventListener("change", importProfileFromFile);
+  $("batchLaunchBtn").addEventListener("click", batchLaunch);
+  $("batchStopBtn").addEventListener("click", batchStop);
+  $("recycleBinBtn").addEventListener("click", showRecycleBin);
+  $("recycleBackBtn").addEventListener("click", hideRecycleBin);
   $("profileForm").addEventListener("input", markFormDirty);
   $("profileForm").addEventListener("change", markFormDirty);
   $("proxyEnabled").addEventListener("change", (event) => {

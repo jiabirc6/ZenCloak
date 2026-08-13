@@ -22,6 +22,24 @@ python -m PyInstaller --noconfirm --clean zencloak.spec
 
 输出：`dist/ZenCloak.exe`
 
+## 打包快速启动版（onedir）
+
+单文件 EXE 每次启动需要解压依赖，约 20 秒。需要更快启动时改用 onedir 文件夹模式：
+
+```powershell
+python -m PyInstaller --noconfirm --clean zencloak-dir.spec
+```
+
+输出：`dist/ZenCloak/` 文件夹。onedir 启动约 1-2 秒，但发布物是一个目录，便携性不如单个 EXE。
+
+制作 onedir 安装包：
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\zencloak-dir.iss
+```
+
+输出：`installer/ZenCloak-Setup-0.1.0-dir.exe`
+
 ## 制作安装程序
 
 需要 Inno Setup 6：

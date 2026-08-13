@@ -1,5 +1,6 @@
 import argparse
 import ctypes
+import secrets
 import socket
 import threading
 import time
@@ -45,10 +46,26 @@ def _show_already_running() -> None:
         pass
 
 
+class ApiBridge:
+    """Expose the local API token to the pywebview frontend only."""
+
+    def __init__(self, api_token: str) -> None:
+        self._api_token = api_token
+
+    def get_api_token(self) -> str:
+        return self._api_token
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="zencloak", description="ZenCloak 专属指纹浏览器")
     parser.add_argument("--data-dir", type=Path, default=Path.home() / ".zencloak")
     parser.add_argument("--port", type=int, default=None)
+    parser.add_argument(
+        "--api-token",
+        type=str,
+        default=None,
+        help="本地 API 访问令牌，默认每次启动随机生成",
+    )
     parser.add_argument(
         "--headless-ui",
         action="store_true",
@@ -63,7 +80,8 @@ def main(argv: list[str] | None = None) -> None:
 
     store = ProfileStore(args.data_dir, auto_init=True)
     sessions = SessionManager(data_root=store.data_dir)
-    app = create_app(store, sessions)
+    api_token = args.api_token or secrets.token_urlsafe(32)
+    app = create_app(store, sessions, api_token=api_token)
     port = args.port or _free_port()
     url = f"http://127.0.0.1:{port}"
 
@@ -77,6 +95,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         if args.headless_ui:
             print(f"ZenCloak UI: {url}")
+            print(f"API token: {api_token}")
             while thread.is_alive():
                 time.sleep(1)
         else:
@@ -87,6 +106,7 @@ def main(argv: list[str] | None = None) -> None:
                 height=860,
                 min_size=(980, 640),
                 background_color="#edece6",
+                js_api=ApiBridge(api_token),
             )
             webview.start()
     finally:

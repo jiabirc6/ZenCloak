@@ -38,15 +38,27 @@ def test_ui_url_opener_sends_normalized_request():
             creationflags=CREATE_NO_WINDOW,
         )
         url = None
+        api_token = None
         try:
-            for _ in range(60):
+            for _ in range(120):
                 line = proc.stdout.readline()
-                match = re.search(r"http://127\.0\.0\.1:\d+", line or "")
-                if match:
+                if not line:
+                    break
+                match = re.search(r"http://127\.0\.0\.1:\d+", line)
+                if match and url is None:
                     url = match.group(0)
+                token_match = re.search(r"API token: (\S+)", line)
+                if token_match and api_token is None:
+                    api_token = token_match.group(1)
+                if url and api_token:
                     break
             assert url, "ZenCloak UI server did not start"
-            with urllib.request.urlopen(url + "/api/profiles", timeout=5) as response:
+            assert api_token, "API token not printed"
+            request = urllib.request.Request(
+                url + "/api/profiles",
+                headers={"Authorization": f"Bearer {api_token}"},
+            )
+            with urllib.request.urlopen(request, timeout=5) as response:
                 profile = json.loads(response.read().decode("utf-8"))[0]
 
             recorded = []
@@ -86,6 +98,12 @@ def test_ui_url_opener_sends_normalized_request():
 
                 page.on("request", on_request)
                 page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.evaluate(
+                    "localStorage.setItem('zencloak_api_token', "
+                    + json.dumps(api_token)
+                    + ")"
+                )
+                page.reload(wait_until="domcontentloaded")
                 page.wait_for_selector("#profileList .profile-item", timeout=10000)
                 page.wait_for_selector("#openUrlInput", timeout=5000)
                 page.locator("#openUrlInput").fill("google.com")

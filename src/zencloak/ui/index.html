@@ -23,10 +23,21 @@
       <button id="newProfileBtn" class="btn primary">
         <i data-lucide="plus"></i>新建档案
       </button>
+      <div class="sidebar-actions">
+        <button id="importProfileBtn" class="btn" title="导入档案" type="button">
+          <i data-lucide="upload"></i>
+        </button>
+      </div>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
       <nav id="profileList" class="profile-list" aria-label="指纹档案"></nav>
       <div class="sidebar-foot">
-        <span id="engineDot" class="dot"></span>
-        <span id="engineVersion">CloakBrowser</span>
+        <button id="recycleBinBtn" class="btn foot-btn" type="button">
+          <i data-lucide="trash-2"></i>回收站
+        </button>
+        <div class="engine-row">
+          <span id="engineDot" class="dot"></span>
+          <span id="engineVersion">CloakBrowser</span>
+        </div>
       </div>
     </aside>
 
@@ -40,12 +51,24 @@
           </div>
         </div>
         <div class="toolbar-actions">
+          <button id="duplicateBtn" class="btn" title="复制档案" disabled><i data-lucide="copy"></i>复制</button>
+          <button id="exportBtn" class="btn" title="导出档案" disabled><i data-lucide="download"></i>导出</button>
+          <button id="batchLaunchBtn" class="btn" title="批量启动所选档案" disabled><i data-lucide="play"></i>批量启动</button>
+          <button id="batchStopBtn" class="btn" title="批量停止所选档案" disabled><i data-lucide="square"></i>批量停止</button>
           <button id="deleteBtn" class="btn danger"><i data-lucide="trash-2"></i>删除</button>
           <button id="stopBtn" class="btn" disabled><i data-lucide="square"></i>停止</button>
           <button id="launchBtn" class="btn primary"><i data-lucide="play"></i>启动</button>
           <button id="saveBtn" class="btn accent"><i data-lucide="save"></i>保存</button>
         </div>
       </header>
+
+      <section id="recycleView" class="recycle-view" hidden>
+        <div class="recycle-head">
+          <h2>回收站</h2>
+          <button id="recycleBackBtn" class="btn" type="button"><i data-lucide="arrow-left"></i>返回</button>
+        </div>
+        <div id="recycleList" class="recycle-list"></div>
+      </section>
 
       <section class="panel">
         <div class="tabs" role="tablist">
