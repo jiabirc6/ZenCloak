@@ -194,7 +194,9 @@ class SessionManager:
             f"--fingerprint={profile['seed']}",
             f"--fingerprint-screen-width={profile['screen_width']}",
             f"--fingerprint-screen-height={profile['screen_height']}",
-            f"--lang={profile['locale']}",
+            "--lang=zh-CN",
+            f"--fingerprint-locale={profile['locale']}",
+            "--enable-features=Translate",
         ]
         if profile.get("user_agent"):
             args.append(f"--user-agent={profile['user_agent']}")
@@ -203,7 +205,6 @@ class SessionManager:
             "headless": False,
             "args": args,
             "timezone": profile["timezone"],
-            "locale": profile["locale"],
             "humanize": profile["humanize"],
             "human_preset": profile["human_preset"],
         }
