@@ -101,6 +101,10 @@ def test_launch_reaches_running_and_uses_profile_data_dir(tmp_path):
     assert info["status"] == "launching"
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     assert contexts[0][0]["user_data_dir"] == str(tmp_path / "aaaaaaaaaaaa")
+    assert contexts[0][0]["downloads_path"] == str(
+        tmp_path / "aaaaaaaaaaaa" / "Downloads"
+    )
+    assert contexts[0][0]["accept_downloads"] is True
 
 
 def test_launch_passes_fingerprint_and_behavior_kwargs(tmp_path):

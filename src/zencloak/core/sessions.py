@@ -207,7 +207,11 @@ class SessionManager:
             "timezone": profile["timezone"],
             "humanize": profile["humanize"],
             "human_preset": profile["human_preset"],
+            "accept_downloads": True,
         }
+        downloads_dir = self.data_root / profile["id"] / "Downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        kwargs["downloads_path"] = str(downloads_dir)
         cleanup_stale_newtab_extensions(
             profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
         )
