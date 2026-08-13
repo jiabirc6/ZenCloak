@@ -10,13 +10,14 @@ def test_build_newtab_extension_writes_blank_page_and_worker(tmp_path):
     assert manifest["chrome_url_overrides"]["newtab"] == "newtab.html"
     assert manifest["background"]["service_worker"] == "background.js"
     assert manifest["name"] == "ZenCloak Helper"
-    assert manifest["commands"]["translate-page"]["suggested_key"]["default"] == "Alt+Shift+T"
     assert "contextMenus" in manifest["permissions"]
     assert manifest["content_scripts"][0]["js"] == ["content.js"]
+    assert manifest["commands"]["translate-page"]["suggested_key"]["default"] == "Alt+Shift+T"
     html = (ext_dir / "newtab.html").read_text(encoding="utf-8")
     assert "newtab.js" not in html
     background = (ext_dir / "background.js").read_text(encoding="utf-8")
     assert "chrome.contextMenus.create" in background
+    assert "chrome.runtime.onStartup" in background
     assert "chrome.commands.onCommand" in background
     assert "chrome.runtime.onMessage" in background
     assert "{{" not in background
@@ -25,6 +26,7 @@ def test_build_newtab_extension_writes_blank_page_and_worker(tmp_path):
     assert "translate.google.com/translate" in content
     assert "window.location.href" in content
     assert "zencloakTranslateBtn" in content
+    assert "opacity" in content
 
 
 def test_build_newtab_extension_never_embeds_start_url(tmp_path):

@@ -20,13 +20,17 @@ function translateActiveTab() {
   });
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+function createContextMenu() {
   chrome.contextMenus.create({
     id: "zencloak-translate-page",
     title: "ZenCloak 翻译本页",
     contexts: ["page"]
   });
-});
+}
+
+createContextMenu();
+chrome.runtime.onInstalled.addListener(createContextMenu);
+chrome.runtime.onStartup.addListener(createContextMenu);
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "zencloak-translate-page" && tab && tab.url) {
@@ -55,15 +59,23 @@ def _content_js() -> str:
   if (window.__zencloakTranslateButton) return;
   window.__zencloakTranslateButton = true;
 
+  function translate() {
+    const target =
+      "https://translate.google.com/translate?sl=auto&tl=zh-CN&u=" +
+      encodeURIComponent(window.location.href);
+    window.location.href = target;
+  }
+
   const button = document.createElement("button");
   button.id = "zencloakTranslateBtn";
   button.type = "button";
   button.title = "用 Google 翻译打开本页";
   button.textContent = "翻译本页";
+  const BOTTOM_GAP = 120;
   Object.assign(button.style, {
     position: "fixed",
     right: "18px",
-    bottom: "18px",
+    bottom: BOTTOM_GAP + "px",
     zIndex: "2147483647",
     padding: "9px 14px",
     border: "0",
@@ -72,17 +84,82 @@ def _content_js() -> str:
     color: "#fff",
     font: "500 14px/1.2 'Microsoft YaHei', 'PingFang SC', sans-serif",
     boxShadow: "0 4px 14px rgba(15, 118, 110, 0.35)",
-    cursor: "pointer"
+    cursor: "grab",
+    opacity: "0.35",
+    transition: "opacity 0.2s ease",
+    userSelect: "none"
   });
 
-  button.addEventListener("click", () => {
-    const target =
-      "https://translate.google.com/translate?sl=auto&tl=zh-CN&u=" +
-      encodeURIComponent(window.location.href);
-    window.location.href = target;
+  function layoutFromAnchors() {
+    const rect = button.getBoundingClientRect();
+    button.style.left = Math.max(window.innerWidth - rect.width - 18, 0) + "px";
+    button.style.top = Math.max(window.innerHeight - rect.height - BOTTOM_GAP, 0) + "px";
+    button.style.right = "auto";
+    button.style.bottom = "auto";
+  }
+
+  let dragging = false;
+  let moved = false;
+  let startX = 0;
+  let startY = 0;
+  let startLeft = 0;
+  let startTop = 0;
+
+  button.addEventListener("mouseenter", () => {
+    button.style.opacity = "1";
+  });
+  button.addEventListener("mouseleave", () => {
+    button.style.opacity = "0.35";
+  });
+  button.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    dragging = true;
+    moved = false;
+    startX = event.clientX;
+    startY = event.clientY;
+    const rect = button.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    event.preventDefault();
+  });
+  document.addEventListener("mousemove", (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+    const left = Math.min(
+      Math.max(startLeft + dx, 0),
+      Math.max(window.innerWidth - button.offsetWidth, 0)
+    );
+    const top = Math.min(
+      Math.max(startTop + dy, 0),
+      Math.max(window.innerHeight - button.offsetHeight, 0)
+    );
+    button.style.left = left + "px";
+    button.style.top = top + "px";
+    button.style.right = "auto";
+    button.style.bottom = "auto";
+  });
+  document.addEventListener("mouseup", (event) => {
+    if (!dragging) return;
+    dragging = false;
+    if (moved) return;
+    const rect = button.getBoundingClientRect();
+    if (
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom
+    ) {
+      translate();
+    }
+  });
+  window.addEventListener("resize", () => {
+    if (!dragging && button.style.right !== "auto") layoutFromAnchors();
   });
 
   document.documentElement.appendChild(button);
+  layoutFromAnchors();
 })();
 """
 
