@@ -1,6 +1,8 @@
 import os
+import socket
 import threading
 import time
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -10,9 +12,16 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from zencloak.core.fingerprint import default_profile_draft
+from zencloak.core.mihomo import MihomoError, ProxyManager
 from zencloak.core.models import normalize_start_url
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionError, SessionManager
+from zencloak.core.subscriptions import (
+    get_subscription,
+    import_subscription,
+    list_subscriptions,
+    load_nodes,
+)
 
 UI_DIR = Path(__file__).parent / "ui"
 
@@ -21,10 +30,20 @@ def create_app(
     store: ProfileStore,
     sessions: SessionManager,
     api_token: str | None = None,
+    proxy_manager: ProxyManager | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ZenCloak", version="0.2.0")
     app.state.store = store
     app.state.sessions = sessions
+    app.state.proxy_manager = proxy_manager
+
+    def proxy_root() -> Path:
+        return store.data_dir / "proxy"
+
+    def require_proxy_manager() -> ProxyManager:
+        if proxy_manager is None:
+            raise HTTPException(status_code=503, detail="内置代理未启用")
+        return proxy_manager
 
     @app.middleware("http")
     async def require_api_token(request: Request, call_next):
@@ -237,6 +256,67 @@ def create_app(
     def engine_status() -> dict:
         return _engine_info()
 
+    @app.post("/api/proxy/subscriptions/import")
+    def proxy_import_subscription(payload: dict[str, Any]) -> dict:
+        source = payload.get("source")
+        url = payload.get("url")
+        if url:
+            source = _fetch_text(str(url))
+        if not isinstance(source, str) or not source.strip():
+            raise HTTPException(status_code=400, detail="订阅内容不能为空")
+        try:
+            return import_subscription(
+                source,
+                proxy_root(),
+                name=payload.get("name"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/proxy/subscriptions")
+    def proxy_list_subscriptions() -> list[dict]:
+        return list_subscriptions(proxy_root())
+
+    @app.get("/api/proxy/subscriptions/{sub_id}/nodes")
+    def proxy_subscription_nodes(sub_id: str) -> list[dict]:
+        meta = get_subscription(proxy_root(), sub_id)
+        if meta is None:
+            raise HTTPException(status_code=404, detail="订阅不存在")
+        return meta["nodes"]
+
+    @app.post("/api/proxy/nodes/test")
+    def proxy_test_node(payload: dict[str, Any]) -> dict:
+        sub_id = payload.get("subscription_id")
+        node_name = payload.get("node")
+        if not sub_id or not node_name:
+            raise HTTPException(status_code=400, detail="缺少订阅或节点")
+        nodes = load_nodes(proxy_root(), sub_id)
+        node = next((item for item in nodes if item.get("name") == node_name), None)
+        if node is None:
+            raise HTTPException(status_code=404, detail="节点不存在")
+        server = node.get("server")
+        port = node.get("port")
+        if not server or not port:
+            raise HTTPException(status_code=400, detail="节点缺少 server/port")
+        started = time.perf_counter()
+        try:
+            with socket.create_connection((server, int(port)), timeout=6):
+                latency_ms = round((time.perf_counter() - started) * 1000, 1)
+        except OSError as exc:
+            raise HTTPException(status_code=502, detail=f"节点连接失败: {exc}") from exc
+        return {"node": node_name, "latency_ms": latency_ms}
+
+    @app.get("/api/sessions/{profile_id}/proxy/status")
+    def session_proxy_status(profile_id: str) -> dict:
+        manager = require_proxy_manager()
+        status = manager.status(profile_id)
+        if status.get("status") == "running":
+            try:
+                status["exit_ip"] = manager.detect_exit_ip(profile_id)
+            except Exception:  # noqa: BLE001 - exit IP is best effort
+                status["exit_ip"] = None
+        return status
+
     @app.post("/api/shutdown")
     def shutdown() -> dict:
         def _exit_later() -> None:
@@ -270,3 +350,33 @@ def _engine_info() -> dict:
             "binary": None,
             "error": f"{type(exc).__name__}: {exc}",
         }
+
+
+def _fetch_text(url: str) -> str:
+    proxies: list[str | None] = [None]
+    env_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    if env_proxy:
+        proxies.append(env_proxy)
+    else:
+        proxies.append("http://127.0.0.1:7890")
+    last_error: Exception | None = None
+    for proxy in proxies:
+        try:
+            handlers = (
+                [urllib.request.ProxyHandler({"http": proxy, "https": proxy})]
+                if proxy
+                else []
+            )
+            opener = urllib.request.build_opener(*handlers)
+            request = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 ZenCloak"},
+            )
+            with opener.open(request, timeout=30) as response:
+                return response.read().decode("utf-8")
+        except Exception as exc:
+            last_error = exc
+    raise HTTPException(
+        status_code=400,
+        detail=f"订阅下载失败: {last_error}",
+    ) from last_error

@@ -15,6 +15,7 @@ dependencies = [
     "httpx>=0.28",
     "pystray>=0.19",
     "pywebview>=6.0",
+    "PyYAML>=6.0",
     "uvicorn>=0.49",
 ]
 

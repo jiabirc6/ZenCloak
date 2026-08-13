@@ -169,6 +169,37 @@
           <div class="view" data-view="proxy">
             <div class="field full toggle-field">
               <label class="toggle">
+                <input id="proxyBuiltin" type="checkbox">
+                <span>启用内置 Mihomo 代理</span>
+              </label>
+            </div>
+            <div class="field full">
+              <label for="proxyImportUrl">订阅地址</label>
+              <div class="inline-row">
+                <input id="proxyImportUrl" type="url" placeholder="https://example.com/config.yaml">
+                <button id="proxyImportBtn" class="btn" type="button">导入订阅</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="proxySubscription">订阅</label>
+              <select id="proxySubscription"></select>
+            </div>
+            <div class="field">
+              <label for="proxyRegion">地区</label>
+              <select id="proxyRegion">
+                <option value="">全部地区</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="proxyNode">出口节点</label>
+              <select id="proxyNode"></select>
+            </div>
+            <div class="field full">
+              <button id="proxyTestBtn" class="btn" type="button">测试节点延迟</button>
+              <span id="proxyStatusText" class="muted"></span>
+            </div>
+            <div class="field full toggle-field">
+              <label class="toggle">
                 <input id="proxyEnabled" type="checkbox">
                 <span>启用代理</span>
               </label>

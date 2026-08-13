@@ -66,9 +66,11 @@ class SessionManager:
         self,
         data_root: str | Path,
         launcher: Callable[..., Any] = launch_persistent_context,
+        proxy_manager: Any = None,
     ) -> None:
         self.data_root = Path(data_root)
         self._launcher = launcher
+        self._proxy_manager = proxy_manager
         self._sessions: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
@@ -121,7 +123,10 @@ class SessionManager:
 
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
-            context = self._launcher(**self._build_launch_kwargs(profile))
+            proxy_server = self._start_proxy(profile)
+            context = self._launcher(
+                **self._build_launch_kwargs(profile, proxy_server)
+            )
             with self._lock:
                 session["context"] = context
                 session["status"] = "running"
@@ -142,6 +147,8 @@ class SessionManager:
             with self._lock:
                 session["status"] = "error"
                 session["error"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            self._stop_proxy(profile["id"])
 
     def _open_urls_from_queue(self, context: Any, session: dict[str, Any]) -> None:
         while True:
@@ -225,7 +232,9 @@ class SessionManager:
             "error": session["error"],
         }
 
-    def _build_launch_kwargs(self, profile: dict) -> dict:
+    def _build_launch_kwargs(
+        self, profile: dict, proxy_server: str | None = None
+    ) -> dict:
         args = [
             f"--fingerprint={profile['seed']}",
             f"--fingerprint-screen-width={profile['screen_width']}",
@@ -257,7 +266,9 @@ class SessionManager:
         )
         kwargs["extension_paths"] = [str(ext_dir)]
         proxy = profile.get("proxy")
-        if proxy:
+        if proxy_server:
+            kwargs["proxy"] = {"server": proxy_server}
+        elif proxy:
             proxy_dict = {
                 "server": f"{proxy['type']}://{proxy['host']}:{proxy['port']}"
             }
@@ -266,6 +277,30 @@ class SessionManager:
                 proxy_dict["password"] = proxy.get("password", "")
             kwargs["proxy"] = proxy_dict
         return kwargs
+
+    def _start_proxy(self, profile: dict) -> str | None:
+        if not profile.get("proxy_enabled") or profile.get("proxy_mode") != "mihomo":
+            return None
+        if self._proxy_manager is None:
+            raise SessionError("内置代理未启用")
+        sub_id = profile.get("proxy_subscription_id")
+        if not sub_id:
+            raise SessionError("请先为档案选择代理订阅")
+        nodes = self._proxy_manager.load_nodes(sub_id)
+        handle = self._proxy_manager.start(
+            profile["id"],
+            nodes,
+            profile.get("proxy_node"),
+        )
+        return f"socks5://127.0.0.1:{handle.mixed_port}"
+
+    def _stop_proxy(self, profile_id: str) -> None:
+        if self._proxy_manager is None:
+            return
+        try:
+            self._proxy_manager.stop(profile_id)
+        except Exception:  # noqa: BLE001 - cleanup must never break session stop
+            pass
 
     def _redirect_broken_new_tabs(self, context: Any) -> None:
         """Repair third-party new-tab pages that spin instead of loading."""

@@ -1,4 +1,5 @@
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,7 +66,23 @@ def _profile(profile_id="aaaaaaaaaaaa", seed=12345, start_url=None):
     return draft
 
 
-def _manager(tmp_path, launcher=None, contexts=None):
+class FakeProxyManager:
+    def __init__(self):
+        self.started = []
+        self.stopped = []
+
+    def load_nodes(self, sub_id):
+        return [{"name": "美国节点", "type": "vless", "server": "1.2.3.4", "port": 443}]
+
+    def start(self, profile_id, nodes, node_name=None):
+        self.started.append((profile_id, node_name))
+        return SimpleNamespace(mixed_port=17891)
+
+    def stop(self, profile_id):
+        self.stopped.append(profile_id)
+
+
+def _manager(tmp_path, launcher=None, contexts=None, proxy_manager=None):
     if contexts is None:
         contexts = []
 
@@ -74,7 +91,14 @@ def _manager(tmp_path, launcher=None, contexts=None):
         contexts.append((kwargs, context))
         return context
 
-    return SessionManager(data_root=tmp_path, launcher=launcher or default_launcher), contexts
+    return (
+        SessionManager(
+            data_root=tmp_path,
+            launcher=launcher or default_launcher,
+            proxy_manager=proxy_manager,
+        ),
+        contexts,
+    )
 
 
 def _wait_status(manager, profile_id, target, timeout=5):
@@ -151,6 +175,27 @@ def test_launch_re_enables_translate_feature(tmp_path):
         "--disable-features=" in arg and "Translate" in arg
         for arg in cloak_browser.IGNORE_DEFAULT_ARGS
     )
+
+
+def test_launch_starts_mihomo_proxy_and_passes_server(tmp_path):
+    proxy = FakeProxyManager()
+    manager, contexts = _manager(tmp_path, proxy_manager=proxy)
+    profile = _profile()
+    profile.update(
+        {
+            "proxy_enabled": True,
+            "proxy_mode": "mihomo",
+            "proxy_subscription_id": "sub123",
+            "proxy_node": "美国节点",
+        }
+    )
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert proxy.started == [("aaaaaaaaaaaa", "美国节点")]
+    assert contexts[0][0]["proxy"] == {"server": "socks5://127.0.0.1:17891"}
+    manager.stop("aaaaaaaaaaaa")
+    _wait_status(manager, "aaaaaaaaaaaa", "stopped")
+    assert proxy.stopped == ["aaaaaaaaaaaa"]
 
 
 def test_launch_builds_proxy_dict(tmp_path):

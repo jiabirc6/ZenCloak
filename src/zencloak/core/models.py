@@ -63,6 +63,11 @@ class Profile(BaseModel):
     device_memory: int
     user_agent: str | None = None
     proxy: ProxySettings | None = None
+    proxy_enabled: bool = False
+    proxy_mode: Literal["manual", "mihomo"] = "mihomo"
+    proxy_subscription_id: str | None = None
+    proxy_region: str | None = None
+    proxy_node: str | None = None
     humanize: bool = False
     human_preset: Literal["default", "careful", "quick"] = "default"
     start_url: str | None = None

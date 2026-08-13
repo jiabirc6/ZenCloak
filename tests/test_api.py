@@ -80,6 +80,64 @@ def test_health(client):
     assert response.json()["ok"] is True
 
 
+def test_proxy_subscription_import_and_list(client):
+    api_client, _, _ = client
+    source = """
+proxies:
+  - {name: 直连, type: direct}
+  - name: 美国节点
+    type: vless
+    server: 1.2.3.4
+    port: 443
+"""
+    response = api_client.post(
+        "/api/proxy/subscriptions/import",
+        json={"source": source, "name": "测试订阅"},
+    )
+    assert response.status_code == 200
+    meta = response.json()
+    assert meta["name"] == "测试订阅"
+    assert meta["nodes"][0]["region"] == "US"
+    subs = api_client.get("/api/proxy/subscriptions").json()
+    assert any(item["id"] == meta["id"] for item in subs)
+    nodes = api_client.get(
+        f"/api/proxy/subscriptions/{meta['id']}/nodes"
+    ).json()
+    assert nodes[0]["name"] == "美国节点"
+
+
+class FakeProxyManager:
+    def status(self, profile_id):
+        if profile_id == "aaaaaaaaaaaa":
+            return {
+                "profile_id": profile_id,
+                "status": "running",
+                "node": "美国节点",
+                "mixed_port": 17891,
+                "controller_port": 19091,
+                "error": None,
+                "started_at": "2026-01-01T00:00:00+00:00",
+            }
+        return {"profile_id": profile_id, "status": "stopped"}
+
+    def detect_exit_ip(self, profile_id):
+        return "1.2.3.4"
+
+
+def test_session_proxy_status(client):
+    api_client, store, _ = client
+    manager = FakeProxyManager()
+    api_client = TestClient(
+        create_app(store, FakeSessions(), api_token="test-token", proxy_manager=manager)
+    )
+    api_client.headers.update({"Authorization": "Bearer test-token"})
+    response = api_client.get("/api/sessions/aaaaaaaaaaaa/proxy/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "running"
+    assert data["exit_ip"] == "1.2.3.4"
+
+
 def test_list_profiles_includes_auto_initialized_local_profile(client):
     api_client, _, _ = client
     profiles = api_client.get("/api/profiles").json()

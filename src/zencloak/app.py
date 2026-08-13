@@ -13,6 +13,7 @@ import webview
 
 from zencloak.api import create_app
 from zencloak.core.lock import InstanceLock
+from zencloak.core.mihomo import ProxyManager
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionManager
 
@@ -125,9 +126,18 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit("ZenCloak 已在运行")
 
     store = ProfileStore(args.data_dir, auto_init=True)
-    sessions = SessionManager(data_root=store.data_dir)
+    proxy_manager = ProxyManager(data_root=store.data_dir / "proxy")
+    sessions = SessionManager(
+        data_root=store.data_dir,
+        proxy_manager=proxy_manager,
+    )
     api_token = args.api_token or secrets.token_urlsafe(32)
-    app = create_app(store, sessions, api_token=api_token)
+    app = create_app(
+        store,
+        sessions,
+        api_token=api_token,
+        proxy_manager=proxy_manager,
+    )
     port = args.port or _free_port()
     url = f"http://127.0.0.1:{port}"
 

@@ -11,6 +11,8 @@ const STATUS_TEXT = {
 const state = {
   profiles: [],
   sessions: [],
+  subscriptions: [],
+  nodes: [],
   selectedId: null,
   selectedColor: PALETTE[0],
   engine: { available: false, version: null },
@@ -242,6 +244,23 @@ function renderForm() {
   $("humanize").checked = Boolean(profile.humanize);
   $("humanPreset").value = profile.human_preset || "default";
   const proxy = profile.proxy;
+  const builtinProxy = Boolean(profile.proxy_enabled) && profile.proxy_mode === "mihomo";
+  $("proxyBuiltin").checked = builtinProxy;
+  state.selectedSubscriptionId = profile.proxy_subscription_id || "";
+  $("proxySubscription").value = state.selectedSubscriptionId || "";
+  $("proxyRegion").value = profile.proxy_region || "";
+  $("proxyNode").value = profile.proxy_node || "";
+  setProxyBuiltinEnabled(builtinProxy);
+  if (state.selectedSubscriptionId) {
+    loadNodes(state.selectedSubscriptionId).then(() => {
+      $("proxyRegion").value = profile.proxy_region || "";
+      $("proxyNode").value = profile.proxy_node || "";
+    });
+  } else {
+    state.nodes = [];
+    renderRegionOptions();
+    renderNodeOptions();
+  }
   $("proxyEnabled").checked = Boolean(proxy);
   $("proxyType").value = proxy ? proxy.type : "http";
   $("proxyHost").value = proxy ? proxy.host : "";
@@ -281,6 +300,130 @@ function setProxyEnabled(enabled) {
   $("proxyPassword").disabled = !enabled;
 }
 
+function setProxyBuiltinEnabled(enabled) {
+  $("proxyImportUrl").disabled = !enabled;
+  $("proxyImportBtn").disabled = !enabled;
+  $("proxySubscription").disabled = !enabled;
+  $("proxyRegion").disabled = !enabled;
+  $("proxyNode").disabled = !enabled;
+  $("proxyTestBtn").disabled = !enabled;
+}
+
+function renderSubscriptionOptions() {
+  const select = $("proxySubscription");
+  select.innerHTML = "";
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "选择订阅";
+  select.appendChild(empty);
+  for (const item of state.subscriptions) {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = item.name || item.id;
+    select.appendChild(option);
+  }
+  select.value = state.selectedSubscriptionId || "";
+  if (select.value) {
+    loadNodes(select.value);
+  } else {
+    state.nodes = [];
+    renderNodeOptions();
+  }
+}
+
+function renderNodeOptions() {
+  const region = $("proxyRegion").value;
+  const select = $("proxyNode");
+  select.innerHTML = "";
+  const filtered = region
+    ? state.nodes.filter((node) => node.region === region)
+    : state.nodes;
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "选择节点";
+  select.appendChild(empty);
+  for (const node of filtered) {
+    const option = document.createElement("option");
+    option.value = node.name;
+    option.textContent = `${node.name}${node.region ? ` (${node.region})` : ""}`;
+    select.appendChild(option);
+  }
+}
+
+function renderRegionOptions() {
+  const select = $("proxyRegion");
+  select.innerHTML = "";
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "全部地区";
+  select.appendChild(empty);
+  const regions = Array.from(new Set(state.nodes.map((node) => node.region).filter(Boolean)));
+  for (const region of regions) {
+    const option = document.createElement("option");
+    option.value = region;
+    option.textContent = region;
+    select.appendChild(option);
+  }
+}
+
+async function loadSubscriptions() {
+  try {
+    state.subscriptions = await api("/api/proxy/subscriptions");
+  } catch (error) {
+    state.subscriptions = [];
+  }
+  renderSubscriptionOptions();
+}
+
+async function loadNodes(subscriptionId) {
+  if (!subscriptionId) {
+    state.nodes = [];
+    renderNodeOptions();
+    renderRegionOptions();
+    return;
+  }
+  try {
+    state.nodes = await api(`/api/proxy/subscriptions/${subscriptionId}/nodes`);
+  } catch (error) {
+    state.nodes = [];
+    toast(error.message, true);
+  }
+  renderRegionOptions();
+  renderNodeOptions();
+}
+
+async function importSubscription() {
+  const url = $("proxyImportUrl").value.trim();
+  if (!url) return;
+  try {
+    const meta = await api("/api/proxy/subscriptions/import", {
+      method: "POST",
+      body: JSON.stringify({ url, name: "我的订阅" }),
+    });
+    state.subscriptions.push(meta);
+    state.selectedSubscriptionId = meta.id;
+    renderSubscriptionOptions();
+    toast("订阅已导入");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function testNode() {
+  const subId = $("proxySubscription").value;
+  const node = $("proxyNode").value;
+  if (!subId || !node) return;
+  try {
+    const result = await api("/api/proxy/nodes/test", {
+      method: "POST",
+      body: JSON.stringify({ subscription_id: subId, node }),
+    });
+    $("proxyStatusText").textContent = `${node} 延迟 ${result.latency_ms} ms`;
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
 async function loadSessions() {
   try {
     state.sessions = await api("/api/sessions");
@@ -318,6 +461,7 @@ function renderSessionControls() {
 function readForm() {
   const screen = $("screen").value.split("x").map(Number);
   const proxyEnabled = $("proxyEnabled").checked;
+  const builtinProxy = $("proxyBuiltin").checked;
   return {
     name: $("name").value.trim() || "未命名档案",
     color: state.selectedColor,
@@ -331,6 +475,11 @@ function readForm() {
     device_memory: Number($("deviceMemory").value),
     user_agent: $("userAgent").value.trim() || null,
     start_url: $("startUrl").value.trim() || null,
+    proxy_enabled: builtinProxy,
+    proxy_mode: builtinProxy ? "mihomo" : "manual",
+    proxy_subscription_id: builtinProxy ? $("proxySubscription").value || null : null,
+    proxy_region: builtinProxy ? $("proxyRegion").value || null : null,
+    proxy_node: builtinProxy ? $("proxyNode").value || null : null,
     proxy: proxyEnabled
       ? {
           type: $("proxyType").value,
@@ -670,6 +819,22 @@ function bindEvents() {
     formDirty = true;
     setProxyEnabled(event.target.checked);
   });
+  $("proxyBuiltin").addEventListener("change", (event) => {
+    formDirty = true;
+    setProxyBuiltinEnabled(event.target.checked);
+  });
+  $("proxyImportBtn").addEventListener("click", importSubscription);
+  $("proxySubscription").addEventListener("change", (event) => {
+    state.selectedSubscriptionId = event.target.value;
+    loadNodes(event.target.value);
+    markFormDirty();
+  });
+  $("proxyRegion").addEventListener("change", () => {
+    renderNodeOptions();
+    markFormDirty();
+  });
+  $("proxyNode").addEventListener("change", markFormDirty);
+  $("proxyTestBtn").addEventListener("click", testNode);
 
   for (const tab of document.querySelectorAll(".tab")) {
     tab.addEventListener("click", () => {
@@ -693,7 +858,8 @@ async function init() {
   if (window.lucide) window.lucide.createIcons();
   try {
     await getApiToken();
-    await Promise.all([loadEngine(), loadProfiles(), loadSessions()]);
+    await Promise.all([loadEngine(), loadProfiles(), loadSessions(), loadSubscriptions()]);
+    if (state.selectedId) renderForm();
   } catch (error) {
     toast(error.message, true);
   }

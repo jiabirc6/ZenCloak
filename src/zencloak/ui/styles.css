@@ -664,6 +664,21 @@ textarea {
   background: var(--danger);
 }
 
+.inline-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-row input {
+  flex: 1;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 @media (max-width: 980px) {
   .app {
     grid-template-columns: 236px minmax(0, 1fr);
