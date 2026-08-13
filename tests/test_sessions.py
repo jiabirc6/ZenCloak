@@ -195,8 +195,8 @@ def test_redirect_broken_new_tab(tmp_path):
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     page = contexts[0][1].new_page()
     page.url = "chrome://new-tab-page-third-party/loading"
-    manager._redirect_broken_new_tabs(contexts[0][1], "https://example.com")
-    assert page.urls == ["https://example.com"]
+    manager._redirect_broken_new_tabs(contexts[0][1])
+    assert page.urls == ["about:blank"]
 
 
 def test_open_url_when_stopped_raises(tmp_path):

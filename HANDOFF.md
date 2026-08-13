@@ -59,11 +59,11 @@ CloakBrowser v146 内核的 `+` 新标签页会进入 `chrome://new-tab-page-thi
 
 已修复（2026-08-13），当前采用三层防御：
 
-- `newtab-v3` 扩展的 Service Worker 现在会识别并重定向 `chrome://new-tab-page-third-party/`，不再只认 `chrome://newtab`
-- 所有档案启动时都会加载该扩展，即使 `start_url` 为空也会跳转 `about:blank`
-- 会话循环每 0.3 秒扫描一次，把漏网的三方新标签页强制跳转到起始页或空白页
+- `newtab-v3` 扩展的 Service Worker 会识别并重定向 `chrome://new-tab-page-third-party/`，不再只认 `chrome://newtab`
+- 新标签页统一落到 `about:blank` 空白页，不自动加载起始页，避免网络卡顿导致的转圈
+- 所有档案启动时都会加载该扩展；会话循环每 0.3 秒扫描一次，把漏网的三方新标签页强制跳转空白页
 
-已知边界：如果起始页本身加载慢或网络不可达，扩展空白页可能短暂等待，但不会进入第三方转圈死循环。
+已知边界：点 `+` 后显示空白新标签页，需要手动输入网址或用 ZenCloak 面板打开页面。
 
 ### 单文件 EXE 启动慢
 

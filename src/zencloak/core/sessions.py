@@ -92,11 +92,10 @@ class SessionManager:
                 session["error"] = None
             self._prepare_start_page(context, profile)
             self._open_urls_from_queue(context, session)
-            start_url = profile.get("start_url")
             while not session["stop_event"].is_set():
                 if not context.browser.is_connected():
                     break
-                self._redirect_broken_new_tabs(context, start_url)
+                self._redirect_broken_new_tabs(context)
                 self._open_urls_from_queue(context, session)
                 time.sleep(0.3)
             self._close_safely(context)
@@ -226,9 +225,9 @@ class SessionManager:
             kwargs["proxy"] = proxy_dict
         return kwargs
 
-    def _redirect_broken_new_tabs(self, context: Any, start_url: str | None) -> None:
+    def _redirect_broken_new_tabs(self, context: Any) -> None:
         """Repair third-party new-tab pages that spin instead of loading."""
-        target = start_url or "about:blank"
+        target = "about:blank"
         try:
             for page in list(context.pages):
                 try:

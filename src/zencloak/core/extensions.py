@@ -3,23 +3,18 @@ import shutil
 from pathlib import Path
 
 
-def _background_js(start_url: str) -> str:
-    encoded = json.dumps(start_url)
-    return f"""const START_URL = {encoded};
+def _background_js() -> str:
+    return """const FALLBACK_URL = "about:blank";
 
 function shouldRedirect(url) {{
   return (
     url.startsWith("chrome://newtab") ||
-    url.startsWith("chrome-extension://") ||
     url.startsWith("chrome://new-tab-page-third-party")
   );
 }}
 
 function redirectTab(tabId) {{
-  chrome.tabs.get(tabId, (tab) => {{
-    const url = (tab && (tab.url || tab.pendingUrl)) || "";
-    if (shouldRedirect(url)) chrome.tabs.update(tabId, {{ url: START_URL }});
-  }});
+  chrome.tabs.update(tabId, {{ url: FALLBACK_URL }});
 }}
 
 chrome.tabs.onCreated.addListener((tab) => {{
@@ -46,7 +41,6 @@ def build_newtab_extension(
     profile: dict, data_root: str | Path, dir_name: str = "newtab-v3"
 ) -> Path:
     """Write a stable new-tab extension backed by a blank page plus a worker."""
-    url = profile.get("start_url") or "about:blank"
     ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
     ext_dir.mkdir(parents=True, exist_ok=True)
 
@@ -66,7 +60,7 @@ def build_newtab_extension(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>ZenCloak</title></head><body></body></html>",
         encoding="utf-8",
     )
-    (ext_dir / "background.js").write_text(_background_js(url), encoding="utf-8")
+    (ext_dir / "background.js").write_text(_background_js(), encoding="utf-8")
     return ext_dir
 
 

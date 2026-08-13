@@ -12,16 +12,17 @@ def test_build_newtab_extension_writes_blank_page_and_worker(tmp_path):
     html = (ext_dir / "newtab.html").read_text(encoding="utf-8")
     assert "newtab.js" not in html
     background = (ext_dir / "background.js").read_text(encoding="utf-8")
-    assert "https://example.com/path?q=1" in background
+    assert '"about:blank"' in background
     assert "chrome.tabs.onCreated" in background
     assert "chrome://new-tab-page-third-party" in background
 
 
-def test_build_newtab_extension_falls_back_to_blank(tmp_path):
+def test_build_newtab_extension_never_embeds_start_url(tmp_path):
     profile = {"id": "cccccccccccc", "start_url": None}
     ext_dir = build_newtab_extension(profile, tmp_path, dir_name="newtab-v3")
     background = (ext_dir / "background.js").read_text(encoding="utf-8")
     assert '"about:blank"' in background
+    assert "https://example.com/path?q=1" not in background
 
 
 def test_cleanup_keeps_current_newtab_dir(tmp_path):
