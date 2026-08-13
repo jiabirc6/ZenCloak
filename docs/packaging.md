@@ -38,7 +38,7 @@ python -m PyInstaller --noconfirm --clean zencloak-dir.spec
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\zencloak-dir.iss
 ```
 
-输出：`installer/ZenCloak-Setup-0.1.0-dir.exe`
+输出：`installer/ZenCloak-Setup-0.2.0-dir.exe`
 
 ## 制作安装程序
 
@@ -54,14 +54,14 @@ winget install --id JRSoftware.InnoSetup -e
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\zencloak.iss
 ```
 
-输出：`installer/ZenCloak-Setup-0.1.0.exe`
+输出：`installer/ZenCloak-Setup-0.2.0.exe`
 
 ## 发布到 GitHub Releases
 
 ```powershell
-gh release create v0.1.0 installer/ZenCloak-Setup-0.1.0.exe `
-  --title "ZenCloak 0.1.0" `
-  --notes-file installer/release-notes-0.1.0.md
+gh release create v0.2.0 installer/ZenCloak-Setup-0.2.0.exe `
+  --title "ZenCloak 0.2.0" `
+  --notes-file installer/release-notes-0.2.0.md
 ```
 
 ## 说明

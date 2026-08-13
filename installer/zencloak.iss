@@ -1,7 +1,7 @@
 [Setup]
 AppId={{8F7E2A2C-0A76-4B2F-9C9E-3D2E4A6C5B10}
 AppName=ZenCloak
-AppVersion=0.1.0
+AppVersion=0.2.0
 AppPublisher=jiabirc6
 AppPublisherURL=https://github.com/jiabirc6/ZenCloak
 AppSupportURL=https://github.com/jiabirc6/ZenCloak/issues
@@ -10,7 +10,7 @@ DefaultGroupName=ZenCloak
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\installer
-OutputBaseFilename=ZenCloak-Setup-0.1.0
+OutputBaseFilename=ZenCloak-Setup-0.2.0
 SetupIconFile=..\assets\zencloak-icon.ico
 UninstallDisplayIcon={app}\ZenCloak.exe
 Compression=lzma2

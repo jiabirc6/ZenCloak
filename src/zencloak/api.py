@@ -20,7 +20,7 @@ def create_app(
     sessions: SessionManager,
     api_token: str | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="ZenCloak", version="0.1.0")
+    app = FastAPI(title="ZenCloak", version="0.2.0")
     app.state.store = store
     app.state.sessions = sessions
 

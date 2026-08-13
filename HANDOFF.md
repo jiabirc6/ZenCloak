@@ -37,8 +37,8 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 ### 打包与分发
 
 - `dist/ZenCloak.exe`：PyInstaller 单文件 EXE，约 125MB，绿色渐变 Z 图标
-- `installer/ZenCloak-Setup-0.1.0.exe`：Inno Setup 安装包，约 128MB，无需管理员权限，创建开始菜单/桌面快捷方式
-- GitHub Release：https://github.com/jiabirc6/ZenCloak/releases/tag/v0.1.0
+- `installer/ZenCloak-Setup-0.2.0.exe`：Inno Setup 安装包，约 128MB，无需管理员权限，创建开始菜单/桌面快捷方式
+- GitHub Release：https://github.com/jiabirc6/ZenCloak/releases/tag/v0.2.0
 - 安装包不包含 CloakBrowser 二进制，首次启动浏览器档案时自动下载约 200MB 内核到 `~/.cloakbrowser/`
 
 ### 文档
