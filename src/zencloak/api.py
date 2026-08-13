@@ -1,4 +1,6 @@
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -234,6 +236,15 @@ def create_app(
     @app.get("/api/engine")
     def engine_status() -> dict:
         return _engine_info()
+
+    @app.post("/api/shutdown")
+    def shutdown() -> dict:
+        def _exit_later() -> None:
+            time.sleep(0.2)
+            os._exit(0)
+
+        threading.Thread(target=_exit_later, daemon=True).start()
+        return {"ok": True}
 
     if (UI_DIR / "index.html").exists():
         app.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")

@@ -56,19 +56,20 @@ def _build_tray(window, sessions, server):
         return None
 
     def _quit() -> None:
-        def _cleanup_and_exit() -> None:
-            try:
-                sessions.stop_all()
-            except Exception:
-                pass
-            try:
-                server.should_exit = True
-            except Exception:
-                pass
-            time.sleep(0.3)
+        def _force_exit() -> None:
+            time.sleep(0.5)
             os._exit(0)
 
-        threading.Thread(target=_cleanup_and_exit, daemon=True).start()
+        threading.Thread(target=_force_exit, daemon=True).start()
+        try:
+            sessions.stop_all(wait=False)
+        except Exception:
+            pass
+        try:
+            server.should_exit = True
+        except Exception:
+            pass
+        os._exit(0)
 
     def _show_window() -> None:
         try:

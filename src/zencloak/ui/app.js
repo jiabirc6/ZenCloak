@@ -636,6 +636,14 @@ async function openDetectUrl(url) {
   }
 }
 
+async function quitApp() {
+  try {
+    await api("/api/shutdown", { method: "POST" });
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
 function markFormDirty() {
   formDirty = true;
 }
@@ -654,6 +662,7 @@ function bindEvents() {
   $("batchLaunchBtn").addEventListener("click", batchLaunch);
   $("batchStopBtn").addEventListener("click", batchStop);
   $("recycleBinBtn").addEventListener("click", showRecycleBin);
+  $("quitBtn").addEventListener("click", quitApp);
   $("recycleBackBtn").addEventListener("click", hideRecycleBin);
   $("profileForm").addEventListener("input", markFormDirty);
   $("profileForm").addEventListener("change", markFormDirty);
