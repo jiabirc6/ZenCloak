@@ -1,5 +1,6 @@
 import argparse
 import ctypes
+import os
 import secrets
 import socket
 import threading
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> None:
             while thread.is_alive():
                 time.sleep(1)
         else:
-            webview.create_window(
+            window = webview.create_window(
                 "ZenCloak",
                 url,
                 width=1280,
@@ -111,6 +112,26 @@ def main(argv: list[str] | None = None) -> None:
                 background_color="#edece6",
                 js_api=ApiBridge(api_token),
             )
+
+            def _cleanup_and_exit() -> None:
+                try:
+                    sessions.stop_all()
+                except Exception:
+                    pass
+                try:
+                    server.should_exit = True
+                except Exception:
+                    pass
+                time.sleep(0.3)
+                os._exit(0)
+
+            def _schedule_exit() -> None:
+                threading.Thread(target=_cleanup_and_exit, daemon=True).start()
+
+            # pywebview occasionally keeps the process alive after the window
+            # closes, which would hold the instance lock forever.
+            window.events.closing += _schedule_exit
+            window.events.closed += _schedule_exit
             webview.start()
     finally:
         sessions.stop_all()
