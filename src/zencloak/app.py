@@ -47,6 +47,47 @@ def _show_already_running() -> None:
         pass
 
 
+def _build_tray(window, sessions, server):
+    """Create a system-tray icon whose Exit item fully terminates ZenCloak."""
+    try:
+        import pystray
+        from PIL import Image
+    except Exception:
+        return None
+
+    def _quit() -> None:
+        def _cleanup_and_exit() -> None:
+            try:
+                sessions.stop_all()
+            except Exception:
+                pass
+            try:
+                server.should_exit = True
+            except Exception:
+                pass
+            time.sleep(0.3)
+            os._exit(0)
+
+        threading.Thread(target=_cleanup_and_exit, daemon=True).start()
+
+    def _show_window() -> None:
+        try:
+            window.show()
+        except Exception:
+            pass
+
+    icon_path = Path(__file__).parent / "ui" / "assets" / "zencloak-icon.png"
+    try:
+        image = Image.open(icon_path)
+    except Exception:
+        image = Image.new("RGB", (64, 64), "#0f766e")
+    menu = pystray.Menu(
+        pystray.MenuItem("显示 ZenCloak", lambda: _show_window()),
+        pystray.MenuItem("退出 ZenCloak", lambda: _quit()),
+    )
+    return pystray.Icon("zencloak", image, "ZenCloak", menu)
+
+
 class ApiBridge:
     """Expose the local API token to the pywebview frontend only."""
 
@@ -113,25 +154,20 @@ def main(argv: list[str] | None = None) -> None:
                 js_api=ApiBridge(api_token),
             )
 
-            def _cleanup_and_exit() -> None:
+            tray = _build_tray(window, sessions, server)
+            if tray is not None:
+                tray.run_detached()
+
+            def _hide_to_tray() -> bool:
                 try:
-                    sessions.stop_all()
+                    window.hide()
                 except Exception:
                     pass
-                try:
-                    server.should_exit = True
-                except Exception:
-                    pass
-                time.sleep(0.3)
-                os._exit(0)
+                return False
 
-            def _schedule_exit() -> None:
-                threading.Thread(target=_cleanup_and_exit, daemon=True).start()
-
-            # pywebview occasionally keeps the process alive after the window
-            # closes, which would hold the instance lock forever.
-            window.events.closing += _schedule_exit
-            window.events.closed += _schedule_exit
+            # Closing the window hides it to the tray; use the tray Exit item
+            # to fully stop ZenCloak and release the instance lock.
+            window.events.closing += _hide_to_tray
             webview.start()
     finally:
         sessions.stop_all()
