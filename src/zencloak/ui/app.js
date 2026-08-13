@@ -221,6 +221,7 @@ function renderForm() {
   $("stopBtn").disabled = true;
   $("duplicateBtn").disabled = !hasProfile;
   $("exportBtn").disabled = !hasProfile;
+  $("downloadsBtn").disabled = !hasProfile;
   if (!profile) {
     $("profileForm").reset();
     $("colorPicker").innerHTML = "";
@@ -435,6 +436,18 @@ async function exportProfile() {
   }
 }
 
+async function openDownloadsFolder() {
+  if (!state.selectedId) return;
+  try {
+    const result = await api(`/api/profiles/${state.selectedId}/open-downloads`, {
+      method: "POST",
+    });
+    toast(result.path ? `下载目录：${result.path}` : "已打开下载目录");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
 function pickImportFile() {
   $("importFile").click();
 }
@@ -635,6 +648,7 @@ function bindEvents() {
   $("deleteBtn").addEventListener("click", deleteProfile);
   $("duplicateBtn").addEventListener("click", duplicateProfile);
   $("exportBtn").addEventListener("click", exportProfile);
+  $("downloadsBtn").addEventListener("click", openDownloadsFolder);
   $("importProfileBtn").addEventListener("click", pickImportFile);
   $("importFile").addEventListener("change", importProfileFromFile);
   $("batchLaunchBtn").addEventListener("click", batchLaunch);

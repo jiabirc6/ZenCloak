@@ -286,3 +286,14 @@ def test_batch_launch_reports_missing_profile(client):
         "/api/sessions/batch-launch", json={"ids": ["missingprofile"]}
     ).json()
     assert results[0]["ok"] is False
+
+
+def test_open_downloads_opens_profile_folder(monkeypatch, client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    opened = []
+    monkeypatch.setattr("zencloak.api.os.startfile", opened.append)
+    response = api_client.post(f"/api/profiles/{created['id']}/open-downloads")
+    assert response.status_code == 200
+    assert opened and opened[0].endswith("Downloads")
+    assert response.json()["opened"] is True

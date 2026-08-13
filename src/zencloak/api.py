@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +89,17 @@ def create_app(
         if duplicated is None:
             raise HTTPException(status_code=404, detail="档案不存在")
         return duplicated
+
+    @app.post("/api/profiles/{profile_id}/open-downloads")
+    def open_profile_downloads(profile_id: str) -> dict:
+        profile_or_404(profile_id)
+        downloads_dir = store.data_dir / profile_id / "Downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(downloads_dir))
+        except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {"opened": True, "path": str(downloads_dir)}
 
     @app.put("/api/profiles/{profile_id}")
     def update_profile(profile_id: str, payload: dict[str, Any]) -> dict:
