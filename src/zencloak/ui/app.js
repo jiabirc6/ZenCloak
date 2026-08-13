@@ -40,24 +40,31 @@ function waitForPywebview() {
 async function getApiToken() {
   if (cachedApiToken) return cachedApiToken;
   await waitForPywebview();
-  try {
-    if (window.pywebview && window.pywebview.api) {
-      const bridge = window.pywebview.api;
-      const getter = bridge.get_api_token || bridge.getApiToken;
-      if (typeof getter === "function") {
-        const token = await getter();
-        if (token) {
-          cachedApiToken = token;
-          return token;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        const bridge = window.pywebview.api;
+        const getter = bridge.get_api_token || bridge.getApiToken;
+        if (typeof getter === "function") {
+          const token = await getter();
+          if (token) {
+            cachedApiToken = token;
+            return token;
+          }
         }
       }
+    } catch (error) {
+      // bridge not ready yet; retry below
     }
-  } catch (error) {
-    // fall through to localStorage for headless/browser testing
+    const token = localStorage.getItem("zencloak_api_token") || "";
+    if (token) {
+      cachedApiToken = token;
+      return token;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  const token = localStorage.getItem("zencloak_api_token") || "";
-  if (token) cachedApiToken = token;
-  return token;
+  return localStorage.getItem("zencloak_api_token") || "";
 }
 
 async function api(path, options = {}) {
@@ -662,6 +669,7 @@ async function init() {
   bindEvents();
   if (window.lucide) window.lucide.createIcons();
   try {
+    await getApiToken();
     await Promise.all([loadEngine(), loadProfiles(), loadSessions()]);
   } catch (error) {
     toast(error.message, true);
