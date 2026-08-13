@@ -20,26 +20,44 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 let formDirty = false;
-let apiTokenPromise = null;
+let cachedApiToken = null;
 
-function getApiToken() {
-  if (!apiTokenPromise) {
-    apiTokenPromise = (async () => {
-      try {
-        if (
-          window.pywebview &&
-          window.pywebview.api &&
-          typeof window.pywebview.api.get_api_token === "function"
-        ) {
-          return await window.pywebview.api.get_api_token();
+function waitForPywebview() {
+  return new Promise((resolve) => {
+    if (!window.pywebview || window.pywebview.api) {
+      resolve();
+      return;
+    }
+    const onReady = () => {
+      window.removeEventListener("pywebviewready", onReady);
+      resolve();
+    };
+    window.addEventListener("pywebviewready", onReady);
+    setTimeout(resolve, 1500);
+  });
+}
+
+async function getApiToken() {
+  if (cachedApiToken) return cachedApiToken;
+  await waitForPywebview();
+  try {
+    if (window.pywebview && window.pywebview.api) {
+      const bridge = window.pywebview.api;
+      const getter = bridge.get_api_token || bridge.getApiToken;
+      if (typeof getter === "function") {
+        const token = await getter();
+        if (token) {
+          cachedApiToken = token;
+          return token;
         }
-      } catch (error) {
-        // fall through to localStorage for headless/browser testing
       }
-      return localStorage.getItem("zencloak_api_token") || "";
-    })();
+    }
+  } catch (error) {
+    // fall through to localStorage for headless/browser testing
   }
-  return apiTokenPromise;
+  const token = localStorage.getItem("zencloak_api_token") || "";
+  if (token) cachedApiToken = token;
+  return token;
 }
 
 async function api(path, options = {}) {

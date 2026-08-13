@@ -55,6 +55,9 @@ class ApiBridge:
     def get_api_token(self) -> str:
         return self._api_token
 
+    def getApiToken(self) -> str:
+        return self._api_token
+
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="zencloak", description="ZenCloak 专属指纹浏览器")
