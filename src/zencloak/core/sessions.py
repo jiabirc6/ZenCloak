@@ -92,9 +92,11 @@ class SessionManager:
                 session["error"] = None
             self._prepare_start_page(context, profile)
             self._open_urls_from_queue(context, session)
+            start_url = profile.get("start_url")
             while not session["stop_event"].is_set():
                 if not context.browser.is_connected():
                     break
+                self._redirect_broken_new_tabs(context, start_url)
                 self._open_urls_from_queue(context, session)
                 time.sleep(0.3)
             self._close_safely(context)
@@ -206,14 +208,13 @@ class SessionManager:
             "humanize": profile["humanize"],
             "human_preset": profile["human_preset"],
         }
-        if profile.get("start_url"):
-            cleanup_stale_newtab_extensions(
-                profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
-            )
-            ext_dir = build_newtab_extension(
-                profile, self.data_root, dir_name=_NEWTAB_EXTENSION_DIR
-            )
-            kwargs["extension_paths"] = [str(ext_dir)]
+        cleanup_stale_newtab_extensions(
+            profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
+        )
+        ext_dir = build_newtab_extension(
+            profile, self.data_root, dir_name=_NEWTAB_EXTENSION_DIR
+        )
+        kwargs["extension_paths"] = [str(ext_dir)]
         proxy = profile.get("proxy")
         if proxy:
             proxy_dict = {
@@ -224,6 +225,19 @@ class SessionManager:
                 proxy_dict["password"] = proxy.get("password", "")
             kwargs["proxy"] = proxy_dict
         return kwargs
+
+    def _redirect_broken_new_tabs(self, context: Any, start_url: str | None) -> None:
+        """Repair third-party new-tab pages that spin instead of loading."""
+        target = start_url or "about:blank"
+        try:
+            for page in list(context.pages):
+                try:
+                    if page.url.startswith("chrome://new-tab-page-third-party"):
+                        page.goto(target, timeout=8000)
+                except Exception:  # noqa: BLE001 - keep sweeping other pages
+                    pass
+        except Exception:  # noqa: BLE001 - context may be closing
+            pass
 
     def _open_page(self, context: Any, url: str) -> bool:
         try:

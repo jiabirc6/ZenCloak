@@ -57,13 +57,13 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 CloakBrowser v146 内核的 `+` 新标签页会进入 `chrome://new-tab-page-third-party/`，连续多开时会出现页面一直转圈。已确认不是 ZenCloak 代码问题，而是该内核的 New Tab 实现不稳定。
 
-当前缓解方案：
+已修复（2026-08-13），当前采用三层防御：
 
-- 不要点浏览器里的 `+`
-- 用 ZenCloak 面板的「打开网址」输入框开页面
-- 扩展 `newtab-v3` 能覆盖大部分 `+` 场景，偶发空白页但不转圈
+- `newtab-v3` 扩展的 Service Worker 现在会识别并重定向 `chrome://new-tab-page-third-party/`，不再只认 `chrome://newtab`
+- 所有档案启动时都会加载该扩展，即使 `start_url` 为空也会跳转 `about:blank`
+- 会话循环每 0.3 秒扫描一次，把漏网的三方新标签页强制跳转到起始页或空白页
 
-后续要根治，可能需要升级/替换内核，或改用 Obscura 这类更轻量的浏览器引擎。
+已知边界：如果起始页本身加载慢或网络不可达，扩展空白页可能短暂等待，但不会进入第三方转圈死循环。
 
 ### 单文件 EXE 启动慢
 

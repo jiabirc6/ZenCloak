@@ -162,11 +162,13 @@ def test_launch_loads_newtab_extension_when_start_url_set(tmp_path):
     assert extension_paths[0].endswith("newtab-v3")
 
 
-def test_launch_does_not_load_newtab_extension_without_start_url(tmp_path):
+def test_launch_always_loads_newtab_extension(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
-    assert "extension_paths" not in contexts[0][0]
+    extension_paths = contexts[0][0]["extension_paths"]
+    assert len(extension_paths) == 1
+    assert extension_paths[0].endswith("newtab-v3")
 
 
 def test_open_url_after_running_opens_new_page(tmp_path):
@@ -185,6 +187,16 @@ def test_open_url_reports_failure_when_goto_fails(tmp_path):
     contexts[0][1].fail_on = "https://broken.example"
     result = manager.open_url("aaaaaaaaaaaa", "https://broken.example")
     assert result["opened"] is False
+
+
+def test_redirect_broken_new_tab(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    page = contexts[0][1].new_page()
+    page.url = "chrome://new-tab-page-third-party/loading"
+    manager._redirect_broken_new_tabs(contexts[0][1], "https://example.com")
+    assert page.urls == ["https://example.com"]
 
 
 def test_open_url_when_stopped_raises(tmp_path):

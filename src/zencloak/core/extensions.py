@@ -8,7 +8,11 @@ def _background_js(start_url: str) -> str:
     return f"""const START_URL = {encoded};
 
 function shouldRedirect(url) {{
-  return url.startsWith("chrome://newtab") || url.startsWith("chrome-extension://");
+  return (
+    url.startsWith("chrome://newtab") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("chrome://new-tab-page-third-party")
+  );
 }}
 
 function redirectTab(tabId) {{
@@ -42,7 +46,7 @@ def build_newtab_extension(
     profile: dict, data_root: str | Path, dir_name: str = "newtab-v3"
 ) -> Path:
     """Write a stable new-tab extension backed by a blank page plus a worker."""
-    url = profile["start_url"]
+    url = profile.get("start_url") or "about:blank"
     ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
     ext_dir.mkdir(parents=True, exist_ok=True)
 
