@@ -147,14 +147,14 @@ def test_launch_passes_fingerprint_and_behavior_kwargs(tmp_path):
     assert kwargs["headless"] is False
 
 
-def test_launch_keeps_browser_ui_chinese_for_any_locale(tmp_path):
+def test_launch_lang_follows_profile_locale(tmp_path):
     manager, contexts = _manager(tmp_path)
     profile = _profile()
     profile["locale"] = "en-US"
     manager.launch(profile)
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     kwargs = contexts[0][0]
-    assert "--lang=zh-CN" in kwargs["args"]
+    assert "--lang=en-US" in kwargs["args"]
     assert "--fingerprint-locale=en-US" in kwargs["args"]
     assert "locale" not in kwargs
 

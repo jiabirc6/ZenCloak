@@ -239,7 +239,7 @@ class SessionManager:
             f"--fingerprint={profile['seed']}",
             f"--fingerprint-screen-width={profile['screen_width']}",
             f"--fingerprint-screen-height={profile['screen_height']}",
-            "--lang=zh-CN",
+            f"--lang={profile['locale']}",
             f"--fingerprint-locale={profile['locale']}",
             f"--disable-features={_DISABLE_FEATURES_WITHOUT_TRANSLATE}",
             "--enable-features=Translate",
