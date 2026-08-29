@@ -3,14 +3,17 @@ from fastapi.testclient import TestClient
 
 from zencloak.api import create_app
 from zencloak.core.fingerprint import default_profile_draft
+
+from pathlib import Path
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionError
 
 
 class FakeSessions:
-    def __init__(self):
+    def __init__(self, data_root=None):
         self.sessions = {}
         self.opened = []
+        self.data_root = Path(data_root) if data_root else Path("browser-data")
 
     def status(self, profile_id=None):
         if profile_id is None:
@@ -58,6 +61,18 @@ class FakeSessions:
             raise SessionError("档案未运行")
         self.opened.append((profile_id, url))
         return self.status(profile_id)
+    def run_page_op(self, profile_id, op, index=None, max_chars=None, path=None, timeout=30.0):
+        if self.sessions.get(profile_id, {}).get("status") != "running":
+            raise SessionError("档案未运行")
+        if op == "list":
+            return [{"index": 0, "url": "https://example.com", "title": "Example"}]
+        if op == "read":
+            return {"url": "https://example.com", "title": "Example", "text": "正文" * 10}
+        if op == "screenshot":
+            Path(path).write_bytes(b"png")
+            return {"path": path}
+        raise SessionError("未知页面操作")
+
     def run_probe(self, profile_id):
         if self.sessions.get(profile_id, {}).get("status") != "running":
             raise SessionError("档案未运行")
@@ -80,7 +95,7 @@ class FakeSessions:
 @pytest.fixture()
 def client(tmp_path):
     store = ProfileStore(tmp_path, auto_init=True)
-    sessions = FakeSessions()
+    sessions = FakeSessions(data_root=tmp_path / "browser-data")
     api_client = TestClient(create_app(store, sessions, api_token="test-token"))
     api_client.headers.update({"Authorization": "Bearer test-token"})
     return api_client, store, sessions
@@ -514,3 +529,30 @@ def test_session_health_check_returns_report(client, monkeypatch):
     assert report["summary"]["fail"] == 0
     statuses = {check["id"]: check["status"] for check in report["checks"]}
     assert statuses["geo_timezone"] == "pass"
+
+
+def test_session_pages_list_content_screenshot(client):
+    api_client, store, sessions = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    sessions.launch(store.get_profile(created["id"]))
+
+    response = api_client.get(f"/api/sessions/{created['id']}/pages")
+    assert response.status_code == 200
+    assert response.json()[0]["title"] == "Example"
+
+    response = api_client.get(f"/api/sessions/{created['id']}/pages/0/content")
+    assert response.status_code == 200
+    assert response.json()["text"].startswith("正文")
+
+    response = api_client.post(f"/api/sessions/{created['id']}/pages/0/screenshot")
+    assert response.status_code == 200
+    assert Path(response.json()["path"]).read_bytes() == b"png"
+
+
+def test_session_pages_require_running(client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    response = api_client.get(f"/api/sessions/{created['id']}/pages")
+    assert response.status_code == 409
+    response = api_client.post(f"/api/sessions/{created['id']}/pages/0/screenshot")
+    assert response.status_code == 409

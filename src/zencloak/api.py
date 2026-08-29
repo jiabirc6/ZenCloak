@@ -405,6 +405,35 @@ def create_app(
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return build_report(signals, profile, _geo_for_health(profile))
 
+    def _page_op_or_409(profile_id: str, **kwargs) -> Any:
+        try:
+            return sessions.run_page_op(profile_id, **kwargs)
+        except SessionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.get("/api/sessions/{profile_id}/pages")
+    def session_pages(profile_id: str) -> list[dict]:
+        return _page_op_or_409(profile_id, op="list")
+
+    @app.get("/api/sessions/{profile_id}/pages/{index}/content")
+    def session_page_content(
+        profile_id: str, index: int, max_chars: int = 12000
+    ) -> dict:
+        return _page_op_or_409(
+            profile_id, op="read", index=index, max_chars=max_chars
+        )
+
+    @app.post("/api/sessions/{profile_id}/pages/{index}/screenshot")
+    def session_page_screenshot(profile_id: str, index: int) -> dict:
+        shots_dir = (
+            sessions.data_root / profile_id / "screenshots"
+        )
+        shots_dir.mkdir(parents=True, exist_ok=True)
+        path = shots_dir / f"{time.strftime('%Y%m%d-%H%M%S')}.png"
+        return _page_op_or_409(
+            profile_id, op="screenshot", index=index, path=str(path)
+        )
+
     @app.post("/api/shutdown")
     def shutdown() -> dict:
         def _exit_later() -> None:
