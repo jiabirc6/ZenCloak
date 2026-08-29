@@ -734,3 +734,133 @@ textarea {
   padding: 2px 10px;
   font-size: 12px;
 }
+
+/* Health check report modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 28, 24, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.health-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.health-pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.health-pill.pass {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+
+.health-pill.warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.health-pill.fail {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.health-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.health-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.health-item.pass .health-dot {
+  background: var(--success);
+}
+
+.health-item.warn .health-dot {
+  background: var(--amber);
+}
+
+.health-item.fail .health-dot {
+  background: var(--danger);
+}
+
+.health-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.health-text small {
+  color: var(--muted);
+}
+
+.health-status {
+  margin-left: auto;
+  font-size: 12px;
+  flex: none;
+}
+
+.health-item.pass .health-status {
+  color: var(--success);
+}
+
+.health-item.warn .health-status {
+  color: var(--amber);
+}
+
+.health-item.fail .health-status {
+  color: var(--danger);
+}
+
+.modal-backdrop[hidden] {
+  display: none;
+}

@@ -456,6 +456,7 @@ function renderSessionControls() {
   $("launchBtn").disabled = running;
   $("stopBtn").disabled = !running;
   $("deleteBtn").disabled = Boolean(running);
+  $("healthBtn").disabled = session.status !== "running";
   updateConsistencyBanner();
 }
 
@@ -890,6 +891,55 @@ async function quitApp() {
   }
 }
 
+const HEALTH_STATUS_TEXT = { pass: "通过", warn: "警告", fail: "风险" };
+
+async function runHealthCheck() {
+  if (!state.selectedId) return;
+  const session = statusOf(state.selectedId);
+  if (session.status !== "running") {
+    toast("请先启动档案", true);
+    return;
+  }
+  $("healthModal").hidden = false;
+  $("healthSummary").textContent = "正在体检…";
+  $("healthList").innerHTML = "";
+  try {
+    const report = await api(`/api/sessions/${state.selectedId}/health-check`, {
+      method: "POST",
+    });
+    renderHealthReport(report);
+  } catch (error) {
+    closeHealthModal();
+    toast(error.message, true);
+  }
+}
+
+function renderHealthReport(report) {
+  const { pass, warn, fail } = report.summary;
+  $("healthSummary").innerHTML =
+    `<span class="health-pill pass">通过 ${pass}</span>` +
+    `<span class="health-pill warn">警告 ${warn}</span>` +
+    `<span class="health-pill fail">风险 ${fail}</span>`;
+  $("healthList").innerHTML = report.checks
+    .map(
+      (check) => `
+      <div class="health-item ${check.status}">
+        <span class="health-dot"></span>
+        <div class="health-text">
+          <strong>${escapeHtml(check.title)}</strong>
+          <small>${escapeHtml(check.detail)}</small>
+        </div>
+        <span class="health-status">${HEALTH_STATUS_TEXT[check.status] || check.status}</span>
+      </div>`
+    )
+    .join("");
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeHealthModal() {
+  $("healthModal").hidden = true;
+}
+
 function markFormDirty() {
   formDirty = true;
 }
@@ -932,6 +982,14 @@ function bindEvents() {
   });
   $("proxyNode").addEventListener("change", markFormDirty);
   $("proxyTestBtn").addEventListener("click", testNode);
+  $("healthBtn").addEventListener("click", runHealthCheck);
+  $("healthCloseBtn").addEventListener("click", closeHealthModal);
+  $("healthModal").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closeHealthModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("healthModal").hidden) closeHealthModal();
+  });
 
   for (const tab of document.querySelectorAll(".tab")) {
     tab.addEventListener("click", () => {

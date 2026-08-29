@@ -60,6 +60,7 @@
           <button id="batchLaunchBtn" class="btn" title="批量启动所选档案" disabled><i data-lucide="play"></i>批量启动</button>
           <button id="batchStopBtn" class="btn" title="批量停止所选档案" disabled><i data-lucide="square"></i>批量停止</button>
           <button id="deleteBtn" class="btn danger"><i data-lucide="trash-2"></i>删除</button>
+          <button id="healthBtn" class="btn" title="指纹体检" disabled><i data-lucide="activity"></i>体检</button>
           <button id="stopBtn" class="btn" disabled><i data-lucide="square"></i>停止</button>
           <button id="launchBtn" class="btn primary"><i data-lucide="play"></i>启动</button>
           <button id="saveBtn" class="btn accent"><i data-lucide="save"></i>保存</button>
@@ -260,6 +261,16 @@
         </div>
       </section>
     </main>
+  </div>
+  <div id="healthModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>指纹体检报告</h2>
+        <button id="healthCloseBtn" class="btn" type="button"><i data-lucide="x"></i>关闭</button>
+      </div>
+      <div id="healthSummary" class="health-summary"></div>
+      <div id="healthList" class="health-list"></div>
+    </div>
   </div>
   <div id="toast" class="toast" role="status"></div>
 </body>
