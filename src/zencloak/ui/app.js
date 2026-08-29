@@ -456,6 +456,103 @@ function renderSessionControls() {
   $("launchBtn").disabled = running;
   $("stopBtn").disabled = !running;
   $("deleteBtn").disabled = Boolean(running);
+  updateConsistencyBanner();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[ch]);
+}
+
+// 一致性预检按 (档案, 本次启动) 缓存，避免轮询时反复请求 IP 归属接口
+async function updateConsistencyBanner() {
+  const banner = $("consistencyBanner");
+  if (!banner || !state.selectedId) return;
+  const session = statusOf(state.selectedId);
+  const key = `${state.selectedId}:${session.started_at || ""}`;
+  if (session.status !== "running") {
+    state.consistencyKey = key;
+    state.consistency = null;
+    banner.hidden = true;
+    return;
+  }
+  if (state.consistencyKey === key && state.consistency) {
+    renderConsistencyBanner(state.consistency);
+    return;
+  }
+  state.consistencyKey = key;
+  state.consistency = { checked: false };
+  banner.hidden = true;
+  try {
+    const data = await api(`/api/sessions/${state.selectedId}/consistency`);
+    if (statusOf(state.selectedId).started_at !== session.started_at) return;
+    state.consistency = data;
+    renderConsistencyBanner(data);
+  } catch (error) {
+    // 检测是尽力而为，失败保持静默，直到下次启动或切换档案再重试
+  }
+}
+
+function renderConsistencyBanner(data) {
+  const banner = $("consistencyBanner");
+  if (!data || !data.checked) {
+    banner.hidden = true;
+    return;
+  }
+  if (!data.warnings.length) {
+    banner.hidden = false;
+    banner.className = "consistency-banner ok";
+    const place = data.country ? `（${escapeHtml(data.country)}）` : "";
+    banner.innerHTML =
+      `<i data-lucide="shield-check"></i>` +
+      `<span>出口 IP ${escapeHtml(data.ip)}${place} 与档案指纹一致</span>`;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  banner.hidden = false;
+  banner.className = "consistency-banner warn";
+  banner.innerHTML = data.warnings
+    .map((warning) => {
+      const fix =
+        warning.kind === "timezone"
+          ? `<button class="btn mini" data-fix-tz="${escapeHtml(warning.suggested_timezone)}">` +
+            `改为 ${escapeHtml(warning.suggested_timezone)}</button>`
+          : "";
+      return (
+        `<div class="consistency-item">` +
+        `<i data-lucide="alert-triangle"></i>` +
+        `<span>${escapeHtml(warning.message)}</span>${fix}</div>`
+      );
+    })
+    .join("");
+  if (window.lucide) lucide.createIcons();
+  banner.querySelectorAll("[data-fix-tz]").forEach((btn) => {
+    btn.addEventListener("click", () => applyIpTimezone(btn.dataset.fixTz));
+  });
+}
+
+async function applyIpTimezone() {
+  try {
+    const result = await api(`/api/sessions/${state.selectedId}/apply-ip-timezone`, {
+      method: "POST",
+    });
+    const updated = result.profile;
+    const index = state.profiles.findIndex((p) => p.id === updated.id);
+    if (index >= 0) state.profiles[index] = updated;
+    renderProfileList();
+    renderForm();
+    toast(`时区已改为 ${result.timezone}`);
+    state.consistency = null;
+    state.consistencyKey = null;
+    updateConsistencyBanner();
+  } catch (error) {
+    toast(error.message, true);
+  }
 }
 
 function readForm() {

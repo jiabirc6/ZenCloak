@@ -693,3 +693,44 @@ textarea {
     grid-column: auto;
   }
 }
+
+/* Consistency preflight banner */
+.consistency-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.consistency-banner.warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.consistency-banner.ok {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+
+.consistency-banner svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 2px;
+}
+
+.consistency-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.consistency-item .btn.mini {
+  margin-left: auto;
+  padding: 2px 10px;
+  font-size: 12px;
+}
