@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from zencloak.core.consistency import ConsistencyError, check_consistency, lookup_ip_geo
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.mihomo import MihomoError, ProxyManager
 from zencloak.core.models import normalize_start_url
@@ -316,6 +317,67 @@ def create_app(
             except Exception:  # noqa: BLE001 - exit IP is best effort
                 status["exit_ip"] = None
         return status
+
+    def _consistency_report(profile: dict) -> dict:
+        """Resolve the egress geo through the profile's proxy and compare."""
+        if not profile.get("proxy_enabled"):
+            return {"checked": False, "reason": "未启用代理"}
+        if profile.get("proxy_mode") == "mihomo":
+            if proxy_manager is None:
+                raise HTTPException(status_code=503, detail="内置代理未启用")
+            status = proxy_manager.status(profile["id"])
+            if status.get("status") != "running":
+                return {"checked": False, "reason": "代理未运行"}
+            proxy_url = f"http://127.0.0.1:{status['mixed_port']}"
+        else:
+            manual = profile.get("proxy") or {}
+            if manual.get("type") != "http":
+                return {"checked": False, "reason": "SOCKS5 手动代理暂不支持自动检测"}
+            auth = ""
+            if manual.get("username"):
+                auth = f"{manual['username']}:{manual.get('password', '')}@"
+            proxy_url = f"http://{auth}{manual['host']}:{manual['port']}"
+        try:
+            geo = lookup_ip_geo(proxy_url)
+        except ConsistencyError as exc:
+            return {"checked": False, "reason": str(exc)}
+        return {
+            "checked": True,
+            "ip": geo.get("ip"),
+            "country": geo.get("country"),
+            "city": geo.get("city"),
+            "ip_timezone": geo.get("timezone"),
+            "profile_timezone": profile.get("timezone"),
+            "warnings": check_consistency(profile, geo),
+        }
+
+    @app.get("/api/sessions/{profile_id}/consistency")
+    def session_consistency(profile_id: str) -> dict:
+        profile = profile_or_404(profile_id)
+        return _consistency_report(profile)
+
+    @app.post("/api/sessions/{profile_id}/apply-ip-timezone")
+    def session_apply_ip_timezone(profile_id: str) -> dict:
+        profile = profile_or_404(profile_id)
+        report = _consistency_report(profile)
+        if not report.get("checked"):
+            raise HTTPException(
+                status_code=409, detail=report.get("reason") or "无法检测出口 IP"
+            )
+        suggested = next(
+            (
+                w.get("suggested_timezone")
+                for w in report.get("warnings", [])
+                if w.get("kind") == "timezone"
+            ),
+            None,
+        )
+        if not suggested:
+            raise HTTPException(status_code=409, detail="时区已一致，无需修改")
+        updated = store.update_profile(profile_id, {"timezone": suggested})
+        if updated is None:
+            raise HTTPException(status_code=404, detail="档案不存在")
+        return {"ok": True, "timezone": suggested, "profile": updated}
 
     @app.post("/api/shutdown")
     def shutdown() -> dict:

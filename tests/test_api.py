@@ -355,3 +355,107 @@ def test_open_downloads_opens_profile_folder(monkeypatch, client):
     assert response.status_code == 200
     assert opened and opened[0].endswith("Downloads")
     assert response.json()["opened"] is True
+
+
+
+class RunningProxyManager(FakeProxyManager):
+    def status(self, profile_id):
+        base = super().status(profile_id)
+        if "mixed_port" not in base:
+            base = {**base, "mixed_port": 17891}
+        return {**base, "status": "running"}
+
+
+def _consistency_client(monkeypatch, tmp_path, geo=None):
+    store = ProfileStore(tmp_path, auto_init=True)
+    api_client = TestClient(
+        create_app(
+            store,
+            FakeSessions(),
+            api_token="test-token",
+            proxy_manager=RunningProxyManager(),
+        )
+    )
+    api_client.headers.update({"Authorization": "Bearer test-token"})
+    monkeypatch.setattr(
+        "zencloak.api.lookup_ip_geo",
+        lambda proxy_url=None, timeout=10.0, fetch=None: geo
+        or {
+            "ip": "5.6.7.8",
+            "country": "US",
+            "city": "New York",
+            "timezone": "America/New_York",
+        },
+    )
+    return api_client, store
+
+
+def _enable_builtin_proxy(api_client, profile_id):
+    profile = api_client.get(f"/api/profiles/{profile_id}").json()
+    api_client.put(
+        f"/api/profiles/{profile_id}",
+        json={**profile, "proxy_enabled": True, "proxy_mode": "mihomo"},
+    )
+
+
+def test_session_consistency_requires_proxy(client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    response = api_client.get(f"/api/sessions/{created['id']}/consistency")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["checked"] is False
+    assert "未启用代理" in data["reason"]
+
+
+def test_session_consistency_reports_timezone_mismatch(monkeypatch, tmp_path):
+    api_client, _ = _consistency_client(monkeypatch, tmp_path)
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    _enable_builtin_proxy(api_client, created["id"])
+    response = api_client.get(f"/api/sessions/{created['id']}/consistency")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["checked"] is True
+    assert data["ip"] == "5.6.7.8"
+    assert data["ip_timezone"] == "America/New_York"
+    assert "timezone" in [w["kind"] for w in data["warnings"]]
+
+
+def test_session_consistency_when_proxy_stopped(client, monkeypatch):
+    api_client, _, _ = client  # fixture client has no proxy_manager -> 503 path
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    profile = api_client.get(f"/api/profiles/{created['id']}").json()
+    api_client.put(
+        f"/api/profiles/{created['id']}",
+        json={**profile, "proxy_enabled": True, "proxy_mode": "mihomo"},
+    )
+    response = api_client.get(f"/api/sessions/{created['id']}/consistency")
+    assert response.status_code == 503
+
+
+def test_session_apply_ip_timezone(monkeypatch, tmp_path):
+    api_client, store = _consistency_client(monkeypatch, tmp_path)
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    _enable_builtin_proxy(api_client, created["id"])
+    assert created["timezone"] == "Asia/Shanghai"
+    response = api_client.post(f"/api/sessions/{created['id']}/apply-ip-timezone")
+    assert response.status_code == 200
+    assert response.json()["timezone"] == "America/New_York"
+    assert store.get_profile(created["id"])["timezone"] == "America/New_York"
+
+
+def test_session_apply_ip_timezone_already_consistent(monkeypatch, tmp_path):
+    api_client, _ = _consistency_client(
+        monkeypatch,
+        tmp_path,
+        geo={
+            "ip": "5.6.7.8",
+            "country": "CN",
+            "city": "Shanghai",
+            "timezone": "Asia/Shanghai",
+        },
+    )
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    _enable_builtin_proxy(api_client, created["id"])
+    response = api_client.post(f"/api/sessions/{created['id']}/apply-ip-timezone")
+    assert response.status_code == 409
