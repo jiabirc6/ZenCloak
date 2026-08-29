@@ -76,6 +76,7 @@ python -m zencloak
 src/zencloak/
 ├── app.py             # 桌面入口：uvicorn + pywebview
 ├── api.py             # 本地 FastAPI 接口
+├── mcp.py             # MCP Server：AI 助手操控指纹浏览器
 ├── core/
 │   ├── fingerprint.py # 指纹参数与默认档案
 │   ├── models.py      # 档案数据模型与校验
@@ -83,6 +84,10 @@ src/zencloak/
 │   └── sessions.py    # CloakBrowser 会话管理
 └── ui/                # 桌面 UI（HTML / CSS / JS）
 ```
+
+## AI 助手集成（MCP）
+
+ZenCloak 内置 MCP Server，让 ZCode / Claude Desktop / Cursor 等 AI 助手直接操控指纹浏览器：启动停止档案、打开网址、读取页面、截图、跑指纹体检。配置方法与工具列表见 [docs/mcp.md](docs/mcp.md)。
 
 ## 测试
 

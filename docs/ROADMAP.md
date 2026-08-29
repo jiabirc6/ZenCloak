@@ -12,19 +12,22 @@
 - 单实例锁
 - 代理密码 DPAPI 加密
 - 新标签页静态空白页 + Service Worker 跳转
+- 回收站 / 批量启停 / 档案导入导出复制
+- 内置 Mihomo 代理（订阅、节点测速、出口 IP 检测）
+- 代理/指纹一致性预检 + 一键修正时区
+- 指纹体检报告（面板内一键深检）
+- Local API：页面内容读取、截图
+- MCP Server：AI 助手操控指纹浏览器
 
 ## 近期候选
 
 - 档案批量导入 / 导出 / 复制（JSON/CSV）
 - 代理池管理：集中保存、绑定档案、连通性测试、出口 IP 显示
 - 扩展指纹参数 UI：WebRTC、Canvas/WebGL/WebGPU 噪声、GPU、移动端指纹
-- Local API 完善：统一 REST 接口、启动/停止/打开 URL、AI Agent 对接
-- 删除档案进回收站，支持恢复
 - 一键备份全部档案到本地压缩包
 
 ## 中期候选
 
-- MCP Server：让 Claude/Cursor 等 AI 直接操控指纹浏览器
 - 窗口同步：多档案主控/被控输入同步
 - RPA 模板与定时任务：自动登录、批量操作、每日任务
 - 内置指纹体检报告：一键展示 BrowserScan / FingerprintJS 结果
