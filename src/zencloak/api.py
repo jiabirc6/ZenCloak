@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from zencloak.core.consistency import ConsistencyError, check_consistency, lookup_ip_geo
 from zencloak.core.fingerprint import default_profile_draft
+from zencloak.core.health import build_report
 from zencloak.core.mihomo import MihomoError, ProxyManager
 from zencloak.core.models import normalize_start_url
 from zencloak.core.profiles import ProfileStore
@@ -378,6 +379,31 @@ def create_app(
         if updated is None:
             raise HTTPException(status_code=404, detail="档案不存在")
         return {"ok": True, "timezone": suggested, "profile": updated}
+
+    def _geo_for_health(profile: dict) -> dict | None:
+        """Egress geo for the health report; None when it cannot be resolved."""
+        if profile.get("proxy_enabled"):
+            report = _consistency_report(profile)
+            if not report.get("checked"):
+                return None
+            return {
+                "ip": report.get("ip"),
+                "country": report.get("country"),
+                "timezone": report.get("ip_timezone"),
+            }
+        try:
+            return lookup_ip_geo(None)
+        except ConsistencyError:
+            return None
+
+    @app.post("/api/sessions/{profile_id}/health-check")
+    def session_health_check(profile_id: str) -> dict:
+        profile = profile_or_404(profile_id)
+        try:
+            signals = sessions.run_probe(profile_id)
+        except SessionError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return build_report(signals, profile, _geo_for_health(profile))
 
     @app.post("/api/shutdown")
     def shutdown() -> dict:

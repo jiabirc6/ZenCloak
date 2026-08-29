@@ -58,6 +58,23 @@ class FakeSessions:
             raise SessionError("档案未运行")
         self.opened.append((profile_id, url))
         return self.status(profile_id)
+    def run_probe(self, profile_id):
+        if self.sessions.get(profile_id, {}).get("status") != "running":
+            raise SessionError("档案未运行")
+        return {
+            "webdriver": False,
+            "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/146.0.0.0",
+            "language": "en-US",
+            "languages": ["en-US"],
+            "timezone": "America/New_York",
+            "screenWidth": 1920,
+            "screenHeight": 1080,
+            "deviceMemory": 16,
+            "hardwareConcurrency": 8,
+            "webrtcIps": [],
+            "webgl": {"vendor": "v", "renderer": "r"},
+            "canvas": {"first": 1, "second": 2},
+        }
 
 
 @pytest.fixture()
@@ -459,3 +476,41 @@ def test_session_apply_ip_timezone_already_consistent(monkeypatch, tmp_path):
     _enable_builtin_proxy(api_client, created["id"])
     response = api_client.post(f"/api/sessions/{created['id']}/apply-ip-timezone")
     assert response.status_code == 409
+
+
+def test_session_health_check_requires_running(client):
+    api_client, _, _ = client
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    response = api_client.post(f"/api/sessions/{created['id']}/health-check")
+    assert response.status_code == 409
+    assert "档案未运行" in response.json()["detail"]
+
+
+def test_session_health_check_returns_report(client, monkeypatch):
+    api_client, store, sessions = client
+    monkeypatch.setattr(
+        "zencloak.api.lookup_ip_geo",
+        lambda proxy_url=None, timeout=10.0, fetch=None: {
+            "ip": "5.6.7.8",
+            "country": "US",
+            "city": "New York",
+            "timezone": "America/New_York",
+        },
+    )
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    profile = {
+        **store.get_profile(created["id"]),
+        "timezone": "America/New_York",
+        "locale": "en-US",
+    }
+    store.update_profile(created["id"], profile)
+    sessions.launch(store.get_profile(created["id"]))
+    response = api_client.post(f"/api/sessions/{created['id']}/health-check")
+    assert response.status_code == 200
+    report = response.json()
+    ids = [check["id"] for check in report["checks"]]
+    assert {"webdriver", "user_agent", "language", "timezone", "webrtc",
+            "canvas", "geo_timezone", "geo_locale"} <= set(ids)
+    assert report["summary"]["fail"] == 0
+    statuses = {check["id"]: check["status"] for check in report["checks"]}
+    assert statuses["geo_timezone"] == "pass"
