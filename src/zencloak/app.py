@@ -1,5 +1,6 @@
 import argparse
 import ctypes
+import json
 import os
 import secrets
 import socket
@@ -34,6 +35,21 @@ def _wait_until_ready(url: str, timeout: float = 20.0) -> None:
         except Exception:
             time.sleep(0.1)
     raise RuntimeError("ZenCloak 本地服务启动超时")
+
+
+def _runtime_info_path(data_dir: Path) -> Path:
+    return data_dir / "runtime" / "api.json"
+
+
+def write_runtime_info(data_dir: Path, url: str, api_token: str) -> Path:
+    """Publish base URL + token so the MCP server process can discover them."""
+    info_path = _runtime_info_path(data_dir)
+    info_path.parent.mkdir(parents=True, exist_ok=True)
+    info_path.write_text(
+        json.dumps({"base_url": url, "token": api_token}),
+        encoding="utf-8",
+    )
+    return info_path
 
 
 def _show_already_running() -> None:
@@ -147,6 +163,7 @@ def main(argv: list[str] | None = None) -> None:
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     _wait_until_ready(url)
+    runtime_info = write_runtime_info(args.data_dir, url, api_token)
 
     try:
         if args.headless_ui:
@@ -184,6 +201,10 @@ def main(argv: list[str] | None = None) -> None:
         sessions.stop_all()
         server.should_exit = True
         thread.join(timeout=5)
+        try:
+            runtime_info.unlink(missing_ok=True)
+        except Exception:
+            pass
         instance_lock.release()
 
 
