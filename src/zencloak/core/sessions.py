@@ -141,6 +141,43 @@ class SessionManager:
             raise SessionError(f"指纹探测失败: {result}")
         return result
 
+    def run_page_op(
+        self,
+        profile_id: str,
+        op: str,
+        index: int | None = None,
+        max_chars: int | None = None,
+        path: str | None = None,
+        timeout: float = 30.0,
+    ) -> dict:
+        """Run a page operation (list/read/screenshot) in the session thread.
+
+        Same threading constraint as run_probe: the session loop owns the
+        Playwright context, so operations go through the work queue.
+        """
+        if op not in {"list", "read", "screenshot"}:
+            raise SessionError(f"未知页面操作: {op}")
+        with self._lock:
+            session = self._sessions.get(profile_id)
+            if not session or session["status"] not in {"launching", "running"}:
+                raise SessionError("档案未运行")
+            item = {
+                "kind": "page_op",
+                "op": op,
+                "index": index,
+                "max_chars": max_chars,
+                "path": path,
+                "event": threading.Event(),
+                "result": None,
+            }
+            session["urls"].put(item)
+        if not item["event"].wait(timeout):
+            raise SessionError("页面操作超时")
+        result = item["result"]
+        if isinstance(result, Exception):
+            raise SessionError(f"页面操作失败: {result}")
+        return result
+
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
             proxy_server = self._start_proxy(profile)
@@ -178,6 +215,8 @@ class SessionManager:
                 return
             if item.get("kind") == "probe":
                 item["result"] = self._execute_probe(context)
+            elif item.get("kind") == "page_op":
+                item["result"] = self._execute_page_op(context, item)
             else:
                 item["opened"] = self._open_page(context, item["url"])
             item["event"].set()
@@ -359,6 +398,35 @@ class SessionManager:
                 page.close()
             except Exception:  # noqa: BLE001 - page may already be gone
                 pass
+
+    def _execute_page_op(self, context: Any, item: dict[str, Any]) -> Any:
+        op = item["op"]
+        try:
+            pages = list(context.pages)
+            if op == "list":
+                return [
+                    {"index": position, "url": page.url, "title": page.title()}
+                    for position, page in enumerate(pages)
+                ]
+            index = item["index"]
+            if index is None or index < 0 or index >= len(pages):
+                raise SessionError(f"页面不存在（共 {len(pages)} 个，索引 {index}）")
+            page = pages[index]
+            if op == "read":
+                text = page.inner_text("body", timeout=10000)
+                limit = item["max_chars"] or 12000
+                return {
+                    "url": page.url,
+                    "title": page.title(),
+                    "text": text[:limit],
+                }
+            # op == "screenshot"
+            if not item["path"]:
+                raise SessionError("缺少截图保存路径")
+            page.screenshot(path=item["path"], full_page=False)
+            return {"path": item["path"]}
+        except Exception as exc:  # noqa: BLE001 - surfaced to run_page_op caller
+            return exc
 
     def _close_safely(self, context: Any) -> None:
         try:

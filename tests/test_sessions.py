@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -15,6 +16,9 @@ class FakePage:
         self.fail_on = None
         self.evaluate_result = {"webdriver": False}
         self.evaluate_error = None
+        self.title_text = "测试页面"
+        self.body_text = "页面正文内容"
+        self.screenshots = []
 
     def goto(self, url, **_):
         if url == self.fail_on:
@@ -26,6 +30,16 @@ class FakePage:
         if self.evaluate_error:
             raise self.evaluate_error
         return self.evaluate_result
+
+    def title(self):
+        return self.title_text
+
+    def inner_text(self, selector, **_):
+        return self.body_text
+
+    def screenshot(self, path=None, **_):
+        self.screenshots.append(path)
+        Path(path).write_bytes(b"png")
 
     def close(self):
         self.closed = True
@@ -364,3 +378,43 @@ def test_run_probe_requires_running_session(tmp_path):
     manager, _ = _manager(tmp_path)
     with pytest.raises(SessionError, match="档案未运行"):
         manager.run_probe("aaaaaaaaaaaa")
+
+
+def test_run_page_op_list_read_screenshot(tmp_path):
+    manager, _ = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+
+    pages = manager.run_page_op("aaaaaaaaaaaa", "list")
+    assert len(pages) == 1
+    assert pages[0]["index"] == 0
+    assert pages[0]["title"] == "测试页面"
+
+    content = manager.run_page_op("aaaaaaaaaaaa", "read", index=0)
+    assert content["url"] == "about:blank"
+    assert content["title"] == "测试页面"
+    assert content["text"] == "页面正文内容"
+
+    trimmed = manager.run_page_op("aaaaaaaaaaaa", "read", index=0, max_chars=2)
+    assert trimmed["text"] == "页面"
+
+    shot_path = tmp_path / "shot.png"
+    result = manager.run_page_op("aaaaaaaaaaaa", "screenshot", index=0, path=str(shot_path))
+    assert result["path"] == str(shot_path)
+    assert shot_path.read_bytes() == b"png"
+
+
+def test_run_page_op_rejects_unknown_op_and_bad_index(tmp_path):
+    manager, _ = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    with pytest.raises(SessionError, match="未知页面操作"):
+        manager.run_page_op("aaaaaaaaaaaa", "delete")
+    with pytest.raises(SessionError, match="页面不存在"):
+        manager.run_page_op("aaaaaaaaaaaa", "read", index=99)
+
+
+def test_run_page_op_requires_running_session(tmp_path):
+    manager, _ = _manager(tmp_path)
+    with pytest.raises(SessionError, match="档案未运行"):
+        manager.run_page_op("aaaaaaaaaaaa", "list")
