@@ -69,71 +69,85 @@ def _request(
     return response.json()
 
 
-def list_profiles() -> list[dict]:
+def _json_text(value) -> str:
+    """Serialize tool output deterministically; FastMCP passes str through
+    as-is, avoiding its {"result": ...} list wrapping."""
+    return json.dumps(value, ensure_ascii=False, indent=1)
+
+
+def list_profiles() -> str:
     """列出全部指纹档案（含 id、名称、代理、时区、运行状态摘要所需字段）。"""
-    return _request("GET", "/api/profiles")
+    return _json_text(_request("GET", "/api/profiles"))
 
 
-def list_sessions() -> list[dict]:
+def list_sessions() -> str:
     """列出当前会话状态（哪些档案在运行、启动时间、错误信息）。"""
-    return _request("GET", "/api/sessions")
+    return _json_text(_request("GET", "/api/sessions"))
 
 
-def launch_session(profile_id: str) -> dict:
+def launch_session(profile_id: str) -> str:
     """启动指定档案的浏览器窗口。"""
-    return _request("POST", f"/api/sessions/{profile_id}/launch")
+    return _json_text(_request("POST", f"/api/sessions/{profile_id}/launch"))
 
 
-def stop_session(profile_id: str) -> dict:
+def stop_session(profile_id: str) -> str:
     """停止指定档案的浏览器窗口。"""
-    return _request("POST", f"/api/sessions/{profile_id}/stop")
+    return _json_text(_request("POST", f"/api/sessions/{profile_id}/stop"))
 
 
-def open_url(profile_id: str, url: str) -> dict:
+def open_url(profile_id: str, url: str) -> str:
     """在指定档案的浏览器里打开一个 http/https 网址（新标签页）。"""
-    return _request(
-        "POST",
-        f"/api/sessions/{profile_id}/open",
-        payload={"url": url},
+    return _json_text(
+        _request(
+            "POST",
+            f"/api/sessions/{profile_id}/open",
+            payload={"url": url},
+        )
     )
 
 
 def list_pages(profile_id: str) -> list[dict]:
     """列出指定档案浏览器当前打开的标签页（索引、URL、标题）。"""
-    return _request("GET", f"/api/sessions/{profile_id}/pages")
+    return _json_text(_request("GET", f"/api/sessions/{profile_id}/pages"))
 
 
-def read_page(profile_id: str, index: int, max_chars: int = 12000) -> dict:
+def read_page(profile_id: str, index: int, max_chars: int = 12000) -> str:
     """读取指定标签页的正文文本（按 index，见 list_pages；内容截断到 max_chars）。"""
-    return _request(
-        "GET",
-        f"/api/sessions/{profile_id}/pages/{index}/content",
-        params={"max_chars": max_chars},
-        timeout=90.0,
+    return _json_text(
+        _request(
+            "GET",
+            f"/api/sessions/{profile_id}/pages/{index}/content",
+            params={"max_chars": max_chars},
+            timeout=90.0,
+        )
     )
 
 
-def screenshot_page(profile_id: str, index: int) -> dict:
+def screenshot_page(profile_id: str, index: int) -> str:
     """对指定标签页截图，返回保存路径（PNG，可用图片查看工具打开）。"""
-    return _request(
-        "POST",
-        f"/api/sessions/{profile_id}/pages/{index}/screenshot",
-        timeout=90.0,
+    return _json_text(
+        _request(
+            "POST",
+            f"/api/sessions/{profile_id}/pages/{index}/screenshot",
+            timeout=90.0,
+        )
     )
 
 
-def fingerprint_health_check(profile_id: str) -> dict:
+def fingerprint_health_check(profile_id: str) -> str:
     """对运行中的档案做指纹体检，返回 pass/warn/fail 检查项列表。"""
-    return _request(
-        "POST",
-        f"/api/sessions/{profile_id}/health-check",
-        timeout=120.0,
+    return _json_text(
+        _request(
+            "POST",
+            f"/api/sessions/{profile_id}/health-check",
+            timeout=120.0,
+        )
     )
 
 
-def check_consistency(profile_id: str) -> dict:
+def check_consistency(profile_id: str) -> str:
     """检查档案时区/语言与代理出口 IP 是否一致，返回警告列表。"""
-    return _request("GET", f"/api/sessions/{profile_id}/consistency")
+    return _json_text(_request("GET", f"/api/sessions/{profile_id}/consistency"))
 
 
 for _tool in (
