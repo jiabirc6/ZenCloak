@@ -10,6 +10,7 @@ import cloakbrowser.browser as _cloakbrowser_browser
 from cloakbrowser import launch_persistent_context
 
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
+from .health import PROBE_JS
 
 
 class SessionError(RuntimeError):
@@ -121,6 +122,25 @@ class SessionManager:
             result = {**result, "opened": item["opened"]}
         return result
 
+    def run_probe(self, profile_id: str, timeout: float = 30.0) -> dict:
+        """Run the fingerprint probe inside the profile's browser.
+
+        Playwright sync objects must be used from the thread that created
+        them, so the probe is queued and executed by the session loop.
+        """
+        with self._lock:
+            session = self._sessions.get(profile_id)
+            if not session or session["status"] not in {"launching", "running"}:
+                raise SessionError("档案未运行")
+            item = {"kind": "probe", "event": threading.Event(), "result": None}
+            session["urls"].put(item)
+        if not item["event"].wait(timeout):
+            raise SessionError("指纹探测超时")
+        result = item["result"]
+        if isinstance(result, Exception):
+            raise SessionError(f"指纹探测失败: {result}")
+        return result
+
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
             proxy_server = self._start_proxy(profile)
@@ -156,7 +176,10 @@ class SessionManager:
                 item = session["urls"].get_nowait()
             except Empty:
                 return
-            item["opened"] = self._open_page(context, item["url"])
+            if item.get("kind") == "probe":
+                item["result"] = self._execute_probe(context)
+            else:
+                item["opened"] = self._open_page(context, item["url"])
             item["event"].set()
 
     def _prepare_start_page(self, context: Any, profile: dict) -> None:
@@ -321,6 +344,21 @@ class SessionManager:
             return True
         except Exception:  # noqa: BLE001 - a dead page should not kill session
             return False
+
+    def _execute_probe(self, context: Any) -> Any:
+        try:
+            page = context.new_page()
+        except Exception as exc:  # noqa: BLE001 - surfaced to run_probe caller
+            return exc
+        try:
+            return page.evaluate(PROBE_JS)
+        except Exception as exc:  # noqa: BLE001 - surfaced to run_probe caller
+            return exc
+        finally:
+            try:
+                page.close()
+            except Exception:  # noqa: BLE001 - page may already be gone
+                pass
 
     def _close_safely(self, context: Any) -> None:
         try:

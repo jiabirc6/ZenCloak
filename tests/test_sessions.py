@@ -13,12 +13,19 @@ class FakePage:
         self.urls = []
         self.closed = False
         self.fail_on = None
+        self.evaluate_result = {"webdriver": False}
+        self.evaluate_error = None
 
     def goto(self, url, **_):
         if url == self.fail_on:
             raise RuntimeError("goto failed")
         self.url = url
         self.urls.append(url)
+
+    def evaluate(self, script):
+        if self.evaluate_error:
+            raise self.evaluate_error
+        return self.evaluate_result
 
     def close(self):
         self.closed = True
@@ -39,10 +46,12 @@ class FakeContext:
         self.pages = [FakePage("about:blank")]
         self.closed = False
         self.fail_on = None
+        self.evaluate_error = None
 
     def new_page(self):
         page = FakePage()
         page.fail_on = self.fail_on
+        page.evaluate_error = self.evaluate_error
         self.pages.append(page)
         if self.page is None:
             self.page = page
@@ -330,3 +339,28 @@ def test_launcher_error_records_error(tmp_path):
 def test_status_for_unknown_profile_is_stopped(tmp_path):
     manager, _ = _manager(tmp_path)
     assert manager.status("missing")["status"] == "stopped"
+
+
+def test_run_probe_returns_signals_from_session_thread(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    signals = manager.run_probe("aaaaaaaaaaaa")
+    assert signals == {"webdriver": False}
+    probe_page = contexts[0][1].pages[-1]
+    assert probe_page.closed is True
+
+
+def test_run_probe_wraps_evaluate_failure(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    contexts[0][1].evaluate_error = RuntimeError("boom")
+    with pytest.raises(SessionError, match="指纹探测失败"):
+        manager.run_probe("aaaaaaaaaaaa")
+
+
+def test_run_probe_requires_running_session(tmp_path):
+    manager, _ = _manager(tmp_path)
+    with pytest.raises(SessionError, match="档案未运行"):
+        manager.run_probe("aaaaaaaaaaaa")
