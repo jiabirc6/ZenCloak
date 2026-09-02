@@ -771,6 +771,10 @@ async function saveProfile() {
   if (!state.selectedId) return false;
   try {
     const payload = readForm();
+    if (payload.proxy && (!payload.proxy.host || !payload.proxy.port)) {
+      toast("已启用手动代理，请填写主机和端口（或取消勾选「启用手动代理」）", true);
+      return false;
+    }
     const updated = await api(`/api/profiles/${state.selectedId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
