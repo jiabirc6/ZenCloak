@@ -176,59 +176,68 @@
                 <span>启用内置 Mihomo 代理</span>
               </label>
             </div>
-            <div class="field full">
-              <label for="proxyImportUrl">订阅地址</label>
-              <div class="inline-row">
-                <input id="proxyImportUrl" type="url" placeholder="https://example.com/config.yaml">
-                <button id="proxyImportBtn" class="btn" type="button">导入订阅</button>
+            <div id="builtinProxySection">
+              <div class="field full">
+                <label for="proxyImportUrl">订阅地址</label>
+                <div class="inline-row">
+                  <input id="proxyImportUrl" type="url" placeholder="https://example.com/config.yaml">
+                  <button id="proxyImportBtn" class="btn" type="button">导入订阅</button>
+                </div>
+              </div>
+              <div class="field full">
+                <label for="proxySubscription">订阅</label>
+                <div class="inline-row">
+                  <select id="proxySubscription"></select>
+                  <button id="proxyRefreshBtn" class="btn" type="button" title="重新拉取机场节点">
+                    <i data-lucide="refresh-cw"></i>刷新
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="proxyRegion">地区</label>
+                <select id="proxyRegion">
+                  <option value="">全部地区</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="proxyNode">出口节点</label>
+                <select id="proxyNode"></select>
+              </div>
+              <div class="field full">
+                <button id="proxyTestBtn" class="btn" type="button">测试节点延迟</button>
+                <span id="proxyStatusText" class="muted"></span>
               </div>
             </div>
-            <div class="field">
-              <label for="proxySubscription">订阅</label>
-              <select id="proxySubscription"></select>
-            </div>
-            <div class="field">
-              <label for="proxyRegion">地区</label>
-              <select id="proxyRegion">
-                <option value="">全部地区</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="proxyNode">出口节点</label>
-              <select id="proxyNode"></select>
-            </div>
-            <div class="field full">
-              <button id="proxyTestBtn" class="btn" type="button">测试节点延迟</button>
-              <span id="proxyStatusText" class="muted"></span>
-            </div>
-            <div class="field full toggle-field">
-              <label class="toggle">
-                <input id="proxyEnabled" type="checkbox">
-                <span>启用代理</span>
-              </label>
-            </div>
-            <div class="field">
-              <label for="proxyType">代理协议</label>
-              <select id="proxyType">
-                <option value="http">HTTP</option>
-                <option value="socks5">SOCKS5</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="proxyHost">主机</label>
-              <input id="proxyHost" type="text" placeholder="proxy.example.com">
-            </div>
-            <div class="field">
-              <label for="proxyPort">端口</label>
-              <input id="proxyPort" type="number" min="1" max="65535" placeholder="8080">
-            </div>
-            <div class="field">
-              <label for="proxyUsername">用户名</label>
-              <input id="proxyUsername" type="text" autocomplete="off">
-            </div>
-            <div class="field">
-              <label for="proxyPassword">密码</label>
-              <input id="proxyPassword" type="password" autocomplete="new-password">
+            <div id="manualProxySection">
+              <div class="field full toggle-field">
+                <label class="toggle">
+                  <input id="proxyEnabled" type="checkbox">
+                  <span>启用手动代理（HTTP / SOCKS5）</span>
+                </label>
+              </div>
+              <div class="field">
+                <label for="proxyType">代理协议</label>
+                <select id="proxyType">
+                  <option value="http">HTTP</option>
+                  <option value="socks5">SOCKS5</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="proxyHost">主机</label>
+                <input id="proxyHost" type="text" placeholder="proxy.example.com">
+              </div>
+              <div class="field">
+                <label for="proxyPort">端口</label>
+                <input id="proxyPort" type="number" min="1" max="65535" placeholder="8080">
+              </div>
+              <div class="field">
+                <label for="proxyUsername">用户名</label>
+                <input id="proxyUsername" type="text" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="proxyPassword">密码</label>
+                <input id="proxyPassword" type="password" autocomplete="new-password">
+              </div>
             </div>
           </div>
 

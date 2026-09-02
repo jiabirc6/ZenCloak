@@ -556,3 +556,20 @@ def test_session_pages_require_running(client):
     assert response.status_code == 409
     response = api_client.post(f"/api/sessions/{created['id']}/pages/0/screenshot")
     assert response.status_code == 409
+
+
+def test_proxy_subscription_refresh(client, monkeypatch):
+    api_client, _, _ = client
+    monkeypatch.setattr(
+        "zencloak.api.refresh_subscription",
+        lambda root, sub_id: {"id": sub_id, "name": "x", "nodes": [], "providers": {}},
+    )
+    response = api_client.post("/api/proxy/subscriptions/abc123def456/refresh")
+    assert response.status_code == 200
+
+    monkeypatch.setattr(
+        "zencloak.api.refresh_subscription",
+        lambda root, sub_id: (_ for _ in ()).throw(ValueError("订阅不存在")),
+    )
+    response = api_client.post("/api/proxy/subscriptions/missing/refresh")
+    assert response.status_code == 404

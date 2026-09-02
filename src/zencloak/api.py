@@ -23,6 +23,7 @@ from zencloak.core.subscriptions import (
     import_subscription,
     list_subscriptions,
     load_nodes,
+    refresh_subscription,
 )
 
 UI_DIR = Path(__file__).parent / "ui"
@@ -285,6 +286,15 @@ def create_app(
         if meta is None:
             raise HTTPException(status_code=404, detail="订阅不存在")
         return meta["nodes"]
+
+    @app.post("/api/proxy/subscriptions/{sub_id}/refresh")
+    def proxy_refresh_subscription(sub_id: str) -> dict:
+        try:
+            return refresh_subscription(proxy_root(), sub_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - network failures surface to UI
+            raise HTTPException(status_code=502, detail=f"刷新失败: {exc}") from exc
 
     @app.post("/api/proxy/nodes/test")
     def proxy_test_node(payload: dict[str, Any]) -> dict:

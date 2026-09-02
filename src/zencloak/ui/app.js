@@ -301,12 +301,30 @@ function setProxyEnabled(enabled) {
 }
 
 function setProxyBuiltinEnabled(enabled) {
+  $("builtinProxySection").hidden = !enabled;
+  $("manualProxySection").hidden = Boolean(enabled);
   $("proxyImportUrl").disabled = !enabled;
   $("proxyImportBtn").disabled = !enabled;
   $("proxySubscription").disabled = !enabled;
   $("proxyRegion").disabled = !enabled;
   $("proxyNode").disabled = !enabled;
   $("proxyTestBtn").disabled = !enabled;
+  $("proxyRefreshBtn").disabled = !enabled;
+}
+
+const REGION_LABELS = {
+  US: "🇺🇸 美国",
+  HK: "🇭🇰 香港",
+  JP: "🇯🇵 日本",
+  SG: "🇸🇬 新加坡",
+  TW: "🇹🇼 台湾",
+  KR: "🇰🇷 韩国",
+  DE: "🇩🇪 德国",
+  GB: "🇬🇧 英国",
+};
+
+function regionLabel(region) {
+  return REGION_LABELS[region] || region;
 }
 
 function renderSubscriptionOptions() {
@@ -319,7 +337,8 @@ function renderSubscriptionOptions() {
   for (const item of state.subscriptions) {
     const option = document.createElement("option");
     option.value = item.id;
-    option.textContent = item.name || item.id;
+    const count = (item.nodes || []).length;
+    option.textContent = `${item.name || item.id}（${count} 节点）`;
     select.appendChild(option);
   }
   select.value = state.selectedSubscriptionId || "";
@@ -340,12 +359,12 @@ function renderNodeOptions() {
     : state.nodes;
   const empty = document.createElement("option");
   empty.value = "";
-  empty.textContent = "选择节点";
+  empty.textContent = filtered.length ? `选择节点（${filtered.length} 个）` : "选择节点";
   select.appendChild(empty);
   for (const node of filtered) {
     const option = document.createElement("option");
     option.value = node.name;
-    option.textContent = `${node.name}${node.region ? ` (${node.region})` : ""}`;
+    option.textContent = `${node.name} · ${node.type || "?"}${node.region ? ` · ${regionLabel(node.region)}` : ""}`;
     select.appendChild(option);
   }
 }
@@ -361,7 +380,8 @@ function renderRegionOptions() {
   for (const region of regions) {
     const option = document.createElement("option");
     option.value = region;
-    option.textContent = region;
+    const count = state.nodes.filter((node) => node.region === region).length;
+    option.textContent = `${regionLabel(region)}（${count}）`;
     select.appendChild(option);
   }
 }
@@ -398,14 +418,50 @@ async function importSubscription() {
   try {
     const meta = await api("/api/proxy/subscriptions/import", {
       method: "POST",
-      body: JSON.stringify({ url, name: "我的订阅" }),
+      body: JSON.stringify({ url, name: subscriptionNameFromUrl(url) }),
     });
     state.subscriptions.push(meta);
     state.selectedSubscriptionId = meta.id;
     renderSubscriptionOptions();
-    toast("订阅已导入");
+    toast(`订阅已导入（${meta.nodes.length} 节点）`);
   } catch (error) {
     toast(error.message, true);
+  }
+}
+
+function subscriptionNameFromUrl(url) {
+  try {
+    return new URL(url).hostname;
+  } catch (error) {
+    return "我的订阅";
+  }
+}
+
+async function refreshSubscription() {
+  const subId = $("proxySubscription").value;
+  if (!subId) return;
+  const button = $("proxyRefreshBtn");
+  button.disabled = true;
+  try {
+    const meta = await api(`/api/proxy/subscriptions/${subId}/refresh`, {
+      method: "POST",
+    });
+    const index = state.subscriptions.findIndex((item) => item.id === meta.id);
+    if (index >= 0) state.subscriptions[index] = meta;
+    renderSubscriptionOptions();
+    await loadNodes(subId);
+    const failed = Object.entries(meta.providers || {}).filter(([, status]) =>
+      !status.startsWith("ok")
+    );
+    toast(
+      failed.length
+        ? `已刷新 ${meta.nodes.length} 节点，${failed.length} 个机场失败`
+        : `已刷新 ${meta.nodes.length} 节点`
+    );
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -982,6 +1038,7 @@ function bindEvents() {
   });
   $("proxyNode").addEventListener("change", markFormDirty);
   $("proxyTestBtn").addEventListener("click", testNode);
+  $("proxyRefreshBtn").addEventListener("click", refreshSubscription);
   $("healthBtn").addEventListener("click", runHealthCheck);
   $("healthCloseBtn").addEventListener("click", closeHealthModal);
   $("healthModal").addEventListener("click", (event) => {
