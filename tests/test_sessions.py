@@ -46,9 +46,11 @@ class FakePage:
 
 
 class FakeCDP:
-    def __init__(self, context):
+    def __init__(self, context, closes_fail=False):
         self.context = context
         self.closed = []
+        self.closes_fail = closes_fail
+        self.created = 0
         self._ids = {}
 
     def _id_for(self, page):
@@ -63,6 +65,9 @@ class FakeCDP:
                 ]
             }
         if method == "Target.closeTarget":
+            if self.closes_fail:
+                self.closed.append(params["targetId"])
+                return {}
             target = next(
                 page
                 for page in self.context.pages
@@ -74,6 +79,7 @@ class FakeCDP:
             return {}
         if method == "Target.createTarget":
             self.context.pages.append(FakePage(params["url"]))
+            self.created += 1
             return {"targetId": "t-new"}
         raise AssertionError(method)
 
@@ -528,5 +534,27 @@ def test_sweep_covers_plain_ntp_and_extension_variants(tmp_path):
         page = context.new_page()
         page.url = url
         broken.append(page)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr("zencloak.core.sessions.time.sleep", lambda s: None)
     manager._sweep_new_tabs(FakeCDP(context))
+    monkeypatch.undo()
     assert all(page.closed for page in broken)
+
+
+def test_sweep_does_not_multiply_when_closes_are_ignored(tmp_path):
+    """Crash-restore mode ignores closeTarget; sweep must not then create."""
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    context = contexts[0][1]
+    for url in ("chrome://new-tab-page/", "chrome://new-tab-page-third-party/"):
+        page = context.new_page()
+        page.url = url
+    cdp = FakeCDP(context, closes_fail=True)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr("zencloak.core.sessions.time.sleep", lambda s: None)
+    for _ in range(5):
+        manager._sweep_new_tabs(cdp)
+    monkeypatch.undo()
+    assert len(context.pages) == 3  # 无增殖（原 1 空白 + 2 NTP 原样保留）
+    assert cdp.created == 0  # 一次都没补建

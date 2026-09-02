@@ -312,6 +312,7 @@ class SessionManager:
             f"--fingerprint-screen-width={profile['screen_width']}",
             f"--fingerprint-screen-height={profile['screen_height']}",
             f"--lang={profile['locale']}",
+            "--hide-crash-restore-bubble",
             f"--fingerprint-locale={profile['locale']}",
             f"--disable-features={_DISABLE_FEATURES_WITHOUT_TRANSLATE}",
             "--enable-features=Translate",
@@ -402,17 +403,33 @@ class SessionManager:
         not include the NTP host pages — the very tabs that need fixing are
         invisible to a page-based sweep. Raises if the CDP session is dead
         so the caller can recreate it.
+
+        Guard against runaway tab creation: only add replacement tabs when
+        the closes actually took effect (e.g. under crash-restore they may
+        silently fail, and blind createTarget would multiply tabs).
         """
         targets = cdp.send("Target.getTargets")["targetInfos"]
-        for target in targets:
-            if target.get("type") != "page":
-                continue
-            if not self._is_broken_new_tab(target.get("url", "")):
-                continue
+        pages = [t for t in targets if t.get("type") == "page"]
+        broken = [t for t in pages if self._is_broken_new_tab(t.get("url", ""))]
+        if not broken:
+            return
+        closed_ids: list[str] = []
+        for target in broken:
             try:
                 cdp.send("Target.closeTarget", {"targetId": target["targetId"]})
+                closed_ids.append(target["targetId"])
+            except Exception:  # noqa: BLE001 - keep closing the rest
+                pass
+        if not closed_ids:
+            return
+        time.sleep(0.15)
+        after = cdp.send("Target.getTargets")["targetInfos"]
+        if len([t for t in after if t.get("type") == "page"]) >= len(pages):
+            return
+        for _ in closed_ids:
+            try:
                 cdp.send("Target.createTarget", {"url": "about:blank"})
-            except Exception:  # noqa: BLE001 - keep sweeping other tabs
+            except Exception:  # noqa: BLE001 - skip if creation fails
                 pass
 
     def _open_page(self, context: Any, url: str) -> bool:
