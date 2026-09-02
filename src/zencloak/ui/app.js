@@ -310,6 +310,7 @@ function setProxyBuiltinEnabled(enabled) {
   $("proxyNode").disabled = !enabled;
   $("proxyTestBtn").disabled = !enabled;
   $("proxyRefreshBtn").disabled = !enabled;
+  $("proxyDeleteBtn").disabled = !enabled;
 }
 
 const REGION_LABELS = {
@@ -437,8 +438,7 @@ function subscriptionNameFromUrl(url) {
   }
 }
 
-async function refreshSubscription() {
-  const subId = $("proxySubscription").value;
+async function refreshSubscription() {  const subId = $("proxySubscription").value;
   if (!subId) return;
   const button = $("proxyRefreshBtn");
   button.disabled = true;
@@ -462,6 +462,27 @@ async function refreshSubscription() {
     toast(error.message, true);
   } finally {
     button.disabled = false;
+  }
+}
+
+async function deleteSubscription() {
+  const subId = $("proxySubscription").value;
+  if (!subId) return;
+  const sub = state.subscriptions.find((item) => item.id === subId);
+  const label = sub ? sub.name || subId : subId;
+  if (!window.confirm(`删除订阅「${label}」？档案将不再能使用它的节点。`)) return;
+  try {
+    await api(`/api/proxy/subscriptions/${subId}`, { method: "DELETE" });
+    state.subscriptions = state.subscriptions.filter((item) => item.id !== subId);
+    if (state.selectedSubscriptionId === subId) {
+      state.selectedSubscriptionId = "";
+      $("proxySubscription").value = "";
+      await loadNodes("");
+    }
+    renderSubscriptionOptions();
+    toast("订阅已删除");
+  } catch (error) {
+    toast(error.message, true);
   }
 }
 
@@ -1039,6 +1060,7 @@ function bindEvents() {
   $("proxyNode").addEventListener("change", markFormDirty);
   $("proxyTestBtn").addEventListener("click", testNode);
   $("proxyRefreshBtn").addEventListener("click", refreshSubscription);
+  $("proxyDeleteBtn").addEventListener("click", deleteSubscription);
   $("healthBtn").addEventListener("click", runHealthCheck);
   $("healthCloseBtn").addEventListener("click", closeHealthModal);
   $("healthModal").addEventListener("click", (event) => {
