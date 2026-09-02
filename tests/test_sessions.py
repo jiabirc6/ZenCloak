@@ -518,7 +518,7 @@ def test_is_broken_new_tab_covers_all_variants():
     assert broken("chrome://new-tab-page-third-party/index.html")
     assert broken("chrome://new-tab-page/")
     assert broken("chrome://newtab")
-    assert broken("chrome-extension://abcdef/newtab.html")
+    assert not broken("chrome-extension://abcdef/newtab.html")  # 扩展空白页是正常形态
     assert not broken("about:blank")
     assert not broken("https://www.google.com/")
     assert not broken("https://example.com/docs/newtab.html")
@@ -529,16 +529,16 @@ def test_sweep_covers_plain_ntp_and_extension_variants(tmp_path):
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     context = contexts[0][1]
-    broken = []
-    for url in ("chrome://new-tab-page/", "chrome-extension://abc/newtab.html"):
-        page = context.new_page()
-        page.url = url
-        broken.append(page)
+    ntp = context.new_page()
+    ntp.url = "chrome://new-tab-page/"
+    ext_page = context.new_page()
+    ext_page.url = "chrome-extension://abc/newtab.html"
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr("zencloak.core.sessions.time.sleep", lambda s: None)
     manager._sweep_new_tabs(FakeCDP(context))
     monkeypatch.undo()
-    assert all(page.closed for page in broken)
+    assert ntp.closed is True
+    assert ext_page.closed is False  # 扩展空白页不受影响
 
 
 def test_sweep_does_not_multiply_when_closes_are_ignored(tmp_path):

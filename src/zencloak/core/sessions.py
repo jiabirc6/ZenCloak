@@ -381,19 +381,16 @@ class SessionManager:
 
     @staticmethod
     def _is_broken_new_tab(url: str) -> bool:
-        """URLs that should never sit in a visible tab.
+        """NTP host pages that spin instead of rendering.
 
-        Covers the built-in NTP, the third-party NTP host page (which can
-        hang on "加载中…" when the override fails to render), and our own
-        newtab.html when the extension page itself fails to load.
+        Only the built-in new-tab-page hosts count. The extension's own
+        chrome-extension://*/newtab.html is the intended blank new tab and
+        must never be swept — closing it (plus the brief window where the
+        NTP host and the extension page coexist during the override) is
+        what produced two tabs per + click.
         """
-        return (
-            url.startswith("chrome://new-tab-page")
-            or url.startswith("chrome://newtab")
-            or (
-                url.startswith("chrome-extension://")
-                and url.endswith("/newtab.html")
-            )
+        return url.startswith("chrome://new-tab-page") or url.startswith(
+            "chrome://newtab"
         )
 
     def _sweep_new_tabs(self, cdp: Any) -> None:
