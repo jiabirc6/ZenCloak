@@ -35,7 +35,7 @@ def create_app(
     api_token: str | None = None,
     proxy_manager: ProxyManager | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="ZenCloak", version="0.2.0")
+    app = FastAPI(title="ZenCloak", version="0.3.0")
     app.state.store = store
     app.state.sessions = sessions
     app.state.proxy_manager = proxy_manager
