@@ -13,6 +13,7 @@ const state = {
   sessions: [],
   subscriptions: [],
   nodes: [],
+  nodeLatency: {},
   selectedId: null,
   selectedColor: PALETTE[0],
   engine: { available: false, version: null },
@@ -365,7 +366,16 @@ function renderNodeOptions() {
   for (const node of filtered) {
     const option = document.createElement("option");
     option.value = node.name;
-    option.textContent = `${node.name} · ${node.type || "?"}${node.region ? ` · ${regionLabel(node.region)}` : ""}`;
+    const latency = state.nodeLatency[node.name];
+    let suffix = ` · ${node.type || "?"}${node.region ? ` · ${regionLabel(node.region)}` : ""}`;
+    if (latency && latency.error) {
+      suffix += " · 连接失败";
+      option.style.color = "#b4232c";
+    } else if (latency) {
+      suffix += ` · ${latency.ms}ms`;
+      option.style.color = "#177245";
+    }
+    option.textContent = `${node.name}${suffix}`;
     select.appendChild(option);
   }
 }
@@ -397,6 +407,7 @@ async function loadSubscriptions() {
 }
 
 async function loadNodes(subscriptionId) {
+  state.nodeLatency = {};
   if (!subscriptionId) {
     state.nodes = [];
     renderNodeOptions();
@@ -489,15 +500,57 @@ async function deleteSubscription() {
 async function testNode() {
   const subId = $("proxySubscription").value;
   const node = $("proxyNode").value;
-  if (!subId || !node) return;
+  const region = $("proxyRegion").value;
+  if (!subId) return;
+  const targets = region
+    ? state.nodes.filter((item) => item.region === region).map((item) => item.name)
+    : node
+      ? [node]
+      : [];
+  if (!targets.length) {
+    toast("请先选择地区或节点", true);
+    return;
+  }
+  const status = $("proxyStatusText");
+  const button = $("proxyTestBtn");
+  button.disabled = true;
   try {
-    const result = await api("/api/proxy/nodes/test", {
-      method: "POST",
-      body: JSON.stringify({ subscription_id: subId, node }),
-    });
-    $("proxyStatusText").textContent = `${node} 延迟 ${result.latency_ms} ms`;
+    if (targets.length === 1 && !region) {
+      const result = await api("/api/proxy/nodes/test", {
+        method: "POST",
+        body: JSON.stringify({ subscription_id: subId, node: targets[0] }),
+      });
+      state.nodeLatency[targets[0]] = { ms: result.latency_ms };
+      status.textContent = `${targets[0]} 延迟 ${result.latency_ms} ms`;
+    } else {
+      status.textContent = `正在测速 ${targets.length} 个节点…`;
+      const response = await api("/api/proxy/nodes/test-batch", {
+        method: "POST",
+        body: JSON.stringify({ subscription_id: subId, nodes: targets }),
+      });
+      let ok = 0;
+      for (const item of response.results) {
+        if (item.error) {
+          state.nodeLatency[item.node] = { error: item.error };
+        } else {
+          state.nodeLatency[item.node] = { ms: item.latency_ms };
+          ok += 1;
+        }
+      }
+      const best = response.results
+        .filter((item) => item.latency_ms != null)
+        .sort((a, b) => a.latency_ms - b.latency_ms)[0];
+      status.textContent = best
+        ? `已测 ${response.results.length} 个（${ok} 个连通），最快：${best.node} ${best.latency_ms} ms`
+        : `已测 ${response.results.length} 个，全部连接失败`;
+    }
+    renderNodeOptions();
+    if (node) $("proxyNode").value = node;
   } catch (error) {
     toast(error.message, true);
+    status.textContent = "";
+  } finally {
+    button.disabled = false;
   }
 }
 
