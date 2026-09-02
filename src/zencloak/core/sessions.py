@@ -338,6 +338,10 @@ class SessionManager:
                 proxy_dict["username"] = proxy["username"]
                 proxy_dict["password"] = proxy.get("password", "")
             kwargs["proxy"] = proxy_dict
+        else:
+            # Without this Chromium would silently inherit the Windows
+            # system proxy; profiles with no built-in proxy must go direct.
+            args.append("--no-proxy-server")
         return kwargs
 
     def _start_proxy(self, profile: dict) -> str | None:

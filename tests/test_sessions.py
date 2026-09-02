@@ -418,3 +418,48 @@ def test_run_page_op_requires_running_session(tmp_path):
     manager, _ = _manager(tmp_path)
     with pytest.raises(SessionError, match="档案未运行"):
         manager.run_page_op("aaaaaaaaaaaa", "list")
+
+
+def test_launch_without_proxy_forces_direct_connection(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    kwargs = contexts[0][0]
+    assert "--no-proxy-server" in kwargs["args"]
+    assert "proxy" not in kwargs
+
+
+def test_launch_with_mihomo_proxy_does_not_force_direct(tmp_path):
+    proxy = FakeProxyManager()
+    manager, contexts = _manager(tmp_path, proxy_manager=proxy)
+    profile = _profile()
+    profile.update(
+        {
+            "proxy_enabled": True,
+            "proxy_mode": "mihomo",
+            "proxy_subscription_id": "sub123",
+            "proxy_node": "美国节点",
+        }
+    )
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    kwargs = contexts[0][0]
+    assert "--no-proxy-server" not in kwargs["args"]
+    assert kwargs["proxy"] == {"server": "socks5://127.0.0.1:17891"}
+
+
+def test_launch_with_manual_proxy_does_not_force_direct(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["proxy"] = {
+        "type": "http",
+        "host": "proxy.example",
+        "port": 8080,
+        "username": "",
+        "password": "",
+    }
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    kwargs = contexts[0][0]
+    assert "--no-proxy-server" not in kwargs["args"]
+    assert kwargs["proxy"]["server"] == "http://proxy.example:8080"
