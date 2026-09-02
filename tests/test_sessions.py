@@ -45,17 +45,54 @@ class FakePage:
         self.closed = True
 
 
+class FakeCDP:
+    def __init__(self, context):
+        self.context = context
+        self.closed = []
+        self._ids = {}
+
+    def _id_for(self, page):
+        return self._ids.setdefault(id(page), f"t{len(self._ids)}")
+
+    def send(self, method, params=None):
+        if method == "Target.getTargets":
+            return {
+                "targetInfos": [
+                    {"type": "page", "url": page.url, "targetId": self._id_for(page)}
+                    for page in self.context.pages
+                ]
+            }
+        if method == "Target.closeTarget":
+            target = next(
+                page
+                for page in self.context.pages
+                if self._id_for(page) == params["targetId"]
+            )
+            target.close()
+            self.context.pages.remove(target)
+            self.closed.append(params["targetId"])
+            return {}
+        if method == "Target.createTarget":
+            self.context.pages.append(FakePage(params["url"]))
+            return {"targetId": "t-new"}
+        raise AssertionError(method)
+
+
 class FakeBrowser:
-    def __init__(self):
+    def __init__(self, context=None):
         self.connected = True
+        self.context = context
 
     def is_connected(self):
         return self.connected
 
+    def new_browser_cdp_session(self):
+        return FakeCDP(self.context)
+
 
 class FakeContext:
     def __init__(self):
-        self.browser = FakeBrowser()
+        self.browser = FakeBrowser(self)
         self.page = None
         self.pages = [FakePage("about:blank")]
         self.closed = False
@@ -291,14 +328,17 @@ def test_open_url_reports_failure_when_goto_fails(tmp_path):
     assert result["opened"] is False
 
 
-def test_redirect_broken_new_tab(tmp_path):
+def test_sweep_replaces_broken_new_tabs(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
-    page = contexts[0][1].new_page()
-    page.url = "chrome://new-tab-page-third-party/loading"
-    manager._redirect_broken_new_tabs(contexts[0][1])
-    assert page.urls == ["about:blank"]
+    context = contexts[0][1]
+    ntp = context.new_page()
+    ntp.url = "chrome://new-tab-page-third-party/loading"
+    cdp = FakeCDP(context)
+    manager._sweep_new_tabs(cdp)
+    assert ntp.closed is True
+    assert any(p.url == "about:blank" for p in context.pages)
 
 
 def test_open_url_when_stopped_raises(tmp_path):
@@ -478,14 +518,15 @@ def test_is_broken_new_tab_covers_all_variants():
     assert not broken("https://example.com/docs/newtab.html")
 
 
-def test_redirect_broken_new_tab_handles_plain_ntp_and_extension(tmp_path):
+def test_sweep_covers_plain_ntp_and_extension_variants(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     context = contexts[0][1]
+    broken = []
     for url in ("chrome://new-tab-page/", "chrome-extension://abc/newtab.html"):
         page = context.new_page()
         page.url = url
-    manager._redirect_broken_new_tabs(context)
-    urls = [p.url for p in context.pages]
-    assert all(u == "about:blank" for u in urls[1:]), urls
+        broken.append(page)
+    manager._sweep_new_tabs(FakeCDP(context))
+    assert all(page.closed for page in broken)

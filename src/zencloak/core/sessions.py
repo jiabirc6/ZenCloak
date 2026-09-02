@@ -190,10 +190,20 @@ class SessionManager:
                 session["error"] = None
             self._prepare_start_page(context, profile)
             self._open_urls_from_queue(context, session)
+            cdp = None
             while not session["stop_event"].is_set():
                 if not context.browser.is_connected():
                     break
-                self._redirect_broken_new_tabs(context)
+                if cdp is None:
+                    try:
+                        cdp = context.browser.new_browser_cdp_session()
+                    except Exception:  # noqa: BLE001 - retry next tick
+                        cdp = None
+                if cdp is not None:
+                    try:
+                        self._sweep_new_tabs(cdp)
+                    except Exception:  # noqa: BLE001 - session died, recreate
+                        cdp = None
                 self._open_urls_from_queue(context, session)
                 time.sleep(0.3)
             self._close_safely(context)
@@ -385,18 +395,25 @@ class SessionManager:
             )
         )
 
-    def _redirect_broken_new_tabs(self, context: Any) -> None:
-        """Repair new-tab pages that spin instead of loading."""
-        target = "about:blank"
-        try:
-            for page in list(context.pages):
-                try:
-                    if self._is_broken_new_tab(page.url):
-                        page.goto(target, timeout=8000)
-                except Exception:  # noqa: BLE001 - keep sweeping other pages
-                    pass
-        except Exception:  # noqa: BLE001 - context may be closing
-            pass
+    def _sweep_new_tabs(self, cdp: Any) -> None:
+        """Replace spinning new-tab pages with a usable blank tab.
+
+        Uses browser-level CDP because Playwright's ``context.pages`` does
+        not include the NTP host pages — the very tabs that need fixing are
+        invisible to a page-based sweep. Raises if the CDP session is dead
+        so the caller can recreate it.
+        """
+        targets = cdp.send("Target.getTargets")["targetInfos"]
+        for target in targets:
+            if target.get("type") != "page":
+                continue
+            if not self._is_broken_new_tab(target.get("url", "")):
+                continue
+            try:
+                cdp.send("Target.closeTarget", {"targetId": target["targetId"]})
+                cdp.send("Target.createTarget", {"url": "about:blank"})
+            except Exception:  # noqa: BLE001 - keep sweeping other tabs
+                pass
 
     def _open_page(self, context: Any, url: str) -> bool:
         try:
