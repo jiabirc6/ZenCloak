@@ -609,3 +609,41 @@ proxies:
 
     response = api_client.delete("/api/proxy/subscriptions/deadbeef123456")
     assert response.status_code == 404
+
+
+def test_proxy_nodes_test_batch(client, monkeypatch):
+    api_client, _, _ = client
+    source = """
+proxies:
+  - {name: 快节点, type: vless, server: 1.2.3.4, port: 443}
+  - {name: 慢节点, type: vless, server: 5.6.7.8, port: 443}
+"""
+    meta = api_client.post(
+        "/api/proxy/subscriptions/import", json={"source": source}
+    ).json()
+    monkeypatch.setattr(
+        "zencloak.api._tcp_latency",
+        lambda node: (12.3, None) if node["name"] == "快节点" else (None, "timeout"),
+    )
+    response = api_client.post(
+        "/api/proxy/nodes/test-batch",
+        json={
+            "subscription_id": meta["id"],
+            "nodes": ["快节点", "慢节点", "不存在的节点"],
+        },
+    )
+    assert response.status_code == 200
+    results = {r["node"]: r for r in response.json()["results"]}
+    assert results["快节点"]["latency_ms"] == 12.3
+    assert results["快节点"]["error"] is None
+    assert results["慢节点"]["latency_ms"] is None
+    assert results["慢节点"]["error"] == "timeout"
+    assert "不存在的节点" not in results
+
+
+def test_proxy_nodes_test_batch_requires_list(client):
+    api_client, _, _ = client
+    response = api_client.post(
+        "/api/proxy/nodes/test-batch", json={"subscription_id": "x", "nodes": []}
+    )
+    assert response.status_code == 400
