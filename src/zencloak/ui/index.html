@@ -54,16 +54,25 @@
           </div>
         </div>
         <div class="toolbar-actions">
-          <button id="duplicateBtn" class="btn" title="复制档案" disabled><i data-lucide="copy"></i>复制</button>
-          <button id="exportBtn" class="btn" title="导出档案" disabled><i data-lucide="download"></i>导出</button>
-          <button id="downloadsBtn" class="btn" title="打开当前档案下载目录" disabled><i data-lucide="folder-open"></i>下载目录</button>
-          <button id="batchLaunchBtn" class="btn" title="批量启动所选档案" disabled><i data-lucide="play"></i>批量启动</button>
-          <button id="batchStopBtn" class="btn" title="批量停止所选档案" disabled><i data-lucide="square"></i>批量停止</button>
-          <button id="deleteBtn" class="btn danger"><i data-lucide="trash-2"></i>删除</button>
-          <button id="healthBtn" class="btn" title="指纹体检" disabled><i data-lucide="activity"></i>体检</button>
-          <button id="stopBtn" class="btn" disabled><i data-lucide="square"></i>停止</button>
-          <button id="launchBtn" class="btn primary"><i data-lucide="play"></i>启动</button>
-          <button id="saveBtn" class="btn accent"><i data-lucide="save"></i>保存</button>
+          <button id="stopBtn" class="btn" title="停止当前档案" disabled><i data-lucide="square"></i>停止</button>
+          <button id="launchBtn" class="btn primary" title="启动当前档案"><i data-lucide="play"></i>启动</button>
+          <button id="saveBtn" class="btn dark" title="保存当前档案"><i data-lucide="save"></i>保存</button>
+          <div class="more-menu">
+            <button id="moreBtn" class="btn icon" title="更多操作" type="button" aria-haspopup="menu" aria-expanded="false">
+              <i data-lucide="more-horizontal"></i>
+            </button>
+            <div id="moreMenu" class="menu" role="menu" hidden>
+              <button id="duplicateBtn" class="menu-item" role="menuitem" disabled><i data-lucide="copy"></i>复制档案</button>
+              <button id="exportBtn" class="menu-item" role="menuitem" disabled><i data-lucide="download"></i>导出档案</button>
+              <button id="downloadsBtn" class="menu-item" role="menuitem" disabled><i data-lucide="folder-open"></i>下载目录</button>
+              <button id="healthBtn" class="menu-item" role="menuitem" disabled><i data-lucide="activity"></i>指纹体检</button>
+              <div class="menu-sep"></div>
+              <button id="batchLaunchBtn" class="menu-item" role="menuitem" disabled><i data-lucide="play"></i>批量启动所选</button>
+              <button id="batchStopBtn" class="menu-item" role="menuitem" disabled><i data-lucide="square"></i>批量停止所选</button>
+              <div class="menu-sep"></div>
+              <button id="deleteBtn" class="menu-item danger" role="menuitem"><i data-lucide="trash-2"></i>删除档案</button>
+            </div>
+          </div>
         </div>
       </header>
 

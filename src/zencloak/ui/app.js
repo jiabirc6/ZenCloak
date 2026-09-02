@@ -410,6 +410,13 @@ function closeNodeList() {
   if (list) list.hidden = true;
 }
 
+function closeMoreMenu() {
+  const menu = $("moreMenu");
+  if (!menu) return;
+  menu.hidden = true;
+  $("moreBtn").setAttribute("aria-expanded", "false");
+}
+
 function renderRegionOptions() {
   const select = $("proxyRegion");
   select.innerHTML = "";
@@ -1149,6 +1156,12 @@ function bindEvents() {
   });
   document.addEventListener("click", (event) => {
     if (!event.target.closest(".node-select")) closeNodeList();
+    if (!event.target.closest(".more-menu")) closeMoreMenu();
+  });
+  $("moreBtn").addEventListener("click", () => {
+    const menu = $("moreMenu");
+    menu.hidden = !menu.hidden;
+    $("moreBtn").setAttribute("aria-expanded", String(!menu.hidden));
   });
   $("proxyTestBtn").addEventListener("click", testNode);
   $("proxyRefreshBtn").addEventListener("click", refreshSubscription);
@@ -1160,6 +1173,7 @@ function bindEvents() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !$("healthModal").hidden) closeHealthModal();
+    if (event.key === "Escape" && !$("moreMenu").hidden) closeMoreMenu();
   });
 
   for (const tab of document.querySelectorAll(".tab")) {
