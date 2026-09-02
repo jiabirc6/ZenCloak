@@ -48,7 +48,9 @@ def lookup_ip_geo(
             continue
         geo = {
             "ip": data.get("ip") or data.get("query"),
-            "country": (data.get("country") or data.get("countryCode") or "").upper()
+            # countryCode 是 ISO 码（两家都有）；ip-api 的 country 是全称
+            # （"United States"），只在拿不到码时兜底。
+            "country": (data.get("countryCode") or data.get("country") or "").upper()
             or None,
             "city": data.get("city"),
             "timezone": data.get("timezone"),
@@ -56,6 +58,48 @@ def lookup_ip_geo(
         if geo["ip"]:
             return geo
     raise ConsistencyError(f"出口 IP 查询失败: {last_error}")
+
+
+# ip-api 等源的 country 字段可能是英文全称；locale 比较需要 ISO 码。
+# 只收录常见出口国家，其余走精确匹配不受影响。
+COUNTRY_NAME_TO_CODE = {
+    "UNITED STATES": "US",
+    "HONG KONG": "HK",
+    "JAPAN": "JP",
+    "SINGAPORE": "SG",
+    "TAIWAN": "TW",
+    "SOUTH KOREA": "KR",
+    "KOREA, REPUBLIC OF": "KR",
+    "GERMANY": "DE",
+    "UNITED KINGDOM": "GB",
+    "FRANCE": "FR",
+    "NETHERLANDS": "NL",
+    "CANADA": "CA",
+    "AUSTRALIA": "AU",
+    "RUSSIA": "RU",
+    "TURKEY": "TR",
+    "MALAYSIA": "MY",
+    "THAILAND": "TH",
+    "VIETNAM": "VN",
+    "PHILIPPINES": "PH",
+    "INDIA": "IN",
+    "BRAZIL": "BR",
+    "ARGENTINA": "AR",
+    "MEXICO": "MX",
+    "CHINA": "CN",
+    "MACAO": "MO",
+    "MACAU": "MO",
+}
+
+
+def normalize_country(value: str | None) -> str | None:
+    """Normalize a country field to an ISO-2-ish code when recognizable."""
+    if not value:
+        return None
+    upper = value.strip().upper()
+    if len(upper) == 2:
+        return upper
+    return COUNTRY_NAME_TO_CODE.get(upper, upper)
 
 
 def country_from_locale(locale: str | None) -> str | None:
@@ -83,7 +127,7 @@ def check_consistency(profile: dict, geo: dict) -> list[dict]:
             }
         )
     locale_country = country_from_locale(profile.get("locale"))
-    ip_country = geo.get("country")
+    ip_country = normalize_country(geo.get("country"))
     if locale_country and ip_country and locale_country != ip_country:
         warnings.append(
             {

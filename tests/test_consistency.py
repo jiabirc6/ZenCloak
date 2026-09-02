@@ -80,3 +80,24 @@ def test_lookup_ip_geo_all_providers_fail():
 
     with pytest.raises(ConsistencyError):
         lookup_ip_geo(fetch=fake_fetch)
+
+
+def test_lookup_ip_geo_prefers_country_code_over_full_name():
+    """ip-api 的 country 是全称（United States），必须优先取 countryCode。"""
+    def fake_fetch(url, proxy_url, timeout):
+        return {
+            "query": "1.2.3.4",
+            "country": "United States",
+            "countryCode": "US",
+            "city": "Los Angeles",
+            "timezone": "America/Los_Angeles",
+        }
+
+    geo = lookup_ip_geo(fetch=fake_fetch)
+    assert geo["country"] == "US"
+
+
+def test_check_consistency_with_full_country_name_does_not_warn():
+    geo = {"ip": "1.2.3.4", "country": "UNITED STATES", "timezone": "America/Los_Angeles"}
+    profile = {"timezone": "America/Los_Angeles", "locale": "en-US"}
+    assert check_consistency(profile, geo) == []
