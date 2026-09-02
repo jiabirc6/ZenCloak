@@ -847,7 +847,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 8px 10px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -871,21 +871,20 @@ textarea {
 
 .detect-bar {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .detect-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  width: 32px;
   height: 32px;
-  padding: 0 11px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
-  font-size: 12.5px;
   color: var(--muted);
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
@@ -902,8 +901,8 @@ textarea {
 }
 
 .detect-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 /* ===== Url opener (injected by url-opener.js) ===== */

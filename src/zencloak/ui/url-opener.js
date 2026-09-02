@@ -43,16 +43,6 @@
     opener.appendChild(translateButton);
     wrap.prepend(opener);
 
-    opener.style.display = "flex";
-    opener.style.gap = "8px";
-    opener.style.flex = "1 1 320px";
-    input.style.flex = "1";
-    input.style.height = "36px";
-    input.style.padding = "0 12px";
-    input.style.border = "1px solid #d7d5cc";
-    input.style.borderRadius = "8px";
-    input.style.outline = "none";
-
     function open() {
       const url = normalizeHttps(input.value);
       if (!url) return;
