@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import socket
+import sys
 import threading
 import time
 import urllib.request
@@ -23,6 +24,32 @@ def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def _bundled_engine_dir() -> Path | None:
+    """Return the packaged engine dir when the installer bundled a kernel.
+
+    The personal build ships ``<exe dir>/engine/chromium-<version>/``;
+    pointing CLOAKBROWSER_CACHE_DIR there makes cloakbrowser use it instead
+    of downloading to ~/.cloakbrowser.
+    """
+    if not getattr(sys, "frozen", False):
+        return None
+    engine = Path(sys.executable).resolve().parent / "engine"
+    if engine.is_dir() and any(engine.glob("chromium-*")):
+        return engine
+    return None
+
+
+def _install_engine() -> None:
+    """Download the CloakBrowser kernel (public installer post-install step)."""
+    from cloakbrowser.download import ensure_binary
+
+    try:
+        path = ensure_binary()
+    except Exception as exc:  # noqa: BLE001 - surface failure to installer log
+        raise SystemExit(f"内核下载失败: {exc}") from exc
+    raise SystemExit(0)
 
 
 def _wait_until_ready(url: str, timeout: float = 20.0) -> None:
@@ -134,7 +161,19 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="只启动本地服务，不打开桌面窗口",
     )
+    parser.add_argument(
+        "--install-engine",
+        action="store_true",
+        help="下载 CloakBrowser 内核后退出（安装程序后置步骤）",
+    )
     args = parser.parse_args(argv)
+
+    if args.install_engine:
+        _install_engine()
+
+    engine_dir = _bundled_engine_dir()
+    if engine_dir:
+        os.environ.setdefault("CLOAKBROWSER_CACHE_DIR", str(engine_dir))
 
     instance_lock = InstanceLock(args.data_dir / "zencloak.lock")
     if not instance_lock.acquire():
