@@ -171,12 +171,14 @@ def build_newtab_extension(
     ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
     ext_dir.mkdir(parents=True, exist_ok=True)
 
+    # 注意：故意不声明 chrome_url_overrides。这个内核里扩展接管 NTP 会让
+    # 点 + 同时产生"第三方宿主页 + 扩展页"两个目标（双标签的根源）；转圈
+    # 的 NTP 由 SessionManager 的 CDP sweep 统一关掉并补空白页。
     manifest = {
         "manifest_version": 3,
         "name": "ZenCloak Helper",
-        "version": "1.1.0",
-        "description": "ZenCloak new-tab and page translation helper.",
-        "chrome_url_overrides": {"newtab": "newtab.html"},
+        "version": "1.2.0",
+        "description": "ZenCloak page translation helper.",
         "background": {"service_worker": "background.js"},
         "content_scripts": [
             {
@@ -199,10 +201,6 @@ def build_newtab_extension(
     }
     (ext_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    (ext_dir / "newtab.html").write_text(
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>ZenCloak</title></head><body></body></html>",
-        encoding="utf-8",
     )
     (ext_dir / "background.js").write_text(_background_js(), encoding="utf-8")
     (ext_dir / "content.js").write_text(_content_js(), encoding="utf-8")

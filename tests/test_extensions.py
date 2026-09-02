@@ -7,14 +7,13 @@ def test_build_newtab_extension_writes_blank_page_and_worker(tmp_path):
     profile = {"id": "aaaaaaaaaaaa", "start_url": "https://example.com/path?q=1"}
     ext_dir = build_newtab_extension(profile, tmp_path, dir_name="newtab-v3")
     manifest = json.loads((ext_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["chrome_url_overrides"]["newtab"] == "newtab.html"
+    assert "chrome_url_overrides" not in manifest  # 接管 NTP 会导致点 + 双标签
     assert manifest["background"]["service_worker"] == "background.js"
     assert manifest["name"] == "ZenCloak Helper"
     assert "contextMenus" in manifest["permissions"]
     assert manifest["content_scripts"][0]["js"] == ["content.js"]
     assert manifest["commands"]["translate-page"]["suggested_key"]["default"] == "Alt+Shift+T"
-    html = (ext_dir / "newtab.html").read_text(encoding="utf-8")
-    assert "newtab.js" not in html
+    assert not (ext_dir / "newtab.html").exists()
     background = (ext_dir / "background.js").read_text(encoding="utf-8")
     assert "chrome.contextMenus.create" in background
     assert "chrome.runtime.onStartup" in background
