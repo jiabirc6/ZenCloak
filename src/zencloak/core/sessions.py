@@ -368,13 +368,30 @@ class SessionManager:
         except Exception:  # noqa: BLE001 - cleanup must never break session stop
             pass
 
+    @staticmethod
+    def _is_broken_new_tab(url: str) -> bool:
+        """URLs that should never sit in a visible tab.
+
+        Covers the built-in NTP, the third-party NTP host page (which can
+        hang on "加载中…" when the override fails to render), and our own
+        newtab.html when the extension page itself fails to load.
+        """
+        return (
+            url.startswith("chrome://new-tab-page")
+            or url.startswith("chrome://newtab")
+            or (
+                url.startswith("chrome-extension://")
+                and url.endswith("/newtab.html")
+            )
+        )
+
     def _redirect_broken_new_tabs(self, context: Any) -> None:
-        """Repair third-party new-tab pages that spin instead of loading."""
+        """Repair new-tab pages that spin instead of loading."""
         target = "about:blank"
         try:
             for page in list(context.pages):
                 try:
-                    if page.url.startswith("chrome://new-tab-page-third-party"):
+                    if self._is_broken_new_tab(page.url):
                         page.goto(target, timeout=8000)
                 except Exception:  # noqa: BLE001 - keep sweeping other pages
                     pass

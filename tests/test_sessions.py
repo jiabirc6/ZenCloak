@@ -463,3 +463,29 @@ def test_launch_with_manual_proxy_does_not_force_direct(tmp_path):
     kwargs = contexts[0][0]
     assert "--no-proxy-server" not in kwargs["args"]
     assert kwargs["proxy"]["server"] == "http://proxy.example:8080"
+
+
+def test_is_broken_new_tab_covers_all_variants():
+    from zencloak.core.sessions import SessionManager
+
+    broken = SessionManager._is_broken_new_tab
+    assert broken("chrome://new-tab-page-third-party/index.html")
+    assert broken("chrome://new-tab-page/")
+    assert broken("chrome://newtab")
+    assert broken("chrome-extension://abcdef/newtab.html")
+    assert not broken("about:blank")
+    assert not broken("https://www.google.com/")
+    assert not broken("https://example.com/docs/newtab.html")
+
+
+def test_redirect_broken_new_tab_handles_plain_ntp_and_extension(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    context = contexts[0][1]
+    for url in ("chrome://new-tab-page/", "chrome-extension://abc/newtab.html"):
+        page = context.new_page()
+        page.url = url
+    manager._redirect_broken_new_tabs(context)
+    urls = [p.url for p in context.pages]
+    assert all(u == "about:blank" for u in urls[1:]), urls

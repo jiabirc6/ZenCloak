@@ -11,3 +11,6 @@ verify-shots/
 CloakBrowser-ref/
 obscura-ref/
 installer/*.exe
+tmp-newtab-repro/
+tmp-exe-smoke/
+tmp-newtab-repro/
