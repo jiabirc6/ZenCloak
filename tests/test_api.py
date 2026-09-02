@@ -573,3 +573,39 @@ def test_proxy_subscription_refresh(client, monkeypatch):
     )
     response = api_client.post("/api/proxy/subscriptions/missing/refresh")
     assert response.status_code == 404
+
+
+def test_proxy_subscription_delete_flow(client):
+    api_client, store, _ = client
+    source = """
+proxies:
+  - {name: 测试节点, type: vless, server: 1.2.3.4, port: 443}
+"""
+    meta = api_client.post(
+        "/api/proxy/subscriptions/import", json={"source": source, "name": "待删"}
+    ).json()
+
+    # 被档案引用时拒绝删除
+    created = api_client.post("/api/profiles", json=_draft()).json()
+    profile = api_client.get(f"/api/profiles/{created['id']}").json()
+    api_client.put(
+        f"/api/profiles/{created['id']}",
+        json={**profile, "proxy_enabled": True, "proxy_mode": "mihomo",
+              "proxy_subscription_id": meta["id"]},
+    )
+    response = api_client.delete(f"/api/proxy/subscriptions/{meta['id']}")
+    assert response.status_code == 409
+    assert "正被 1 个档案使用" in response.json()["detail"]
+
+    # 解除引用后可删除
+    api_client.put(
+        f"/api/profiles/{created['id']}",
+        json={**profile, "proxy_enabled": False, "proxy_subscription_id": None},
+    )
+    response = api_client.delete(f"/api/proxy/subscriptions/{meta['id']}")
+    assert response.status_code == 200
+    subs = api_client.get("/api/proxy/subscriptions").json()
+    assert meta["id"] not in [s["id"] for s in subs]
+
+    response = api_client.delete("/api/proxy/subscriptions/deadbeef123456")
+    assert response.status_code == 404

@@ -1,4 +1,6 @@
 import json
+import re
+import shutil
 import urllib.request
 import uuid
 from datetime import datetime, timezone
@@ -231,6 +233,17 @@ def get_subscription(
     if not meta_path.exists():
         return None
     return json.loads(meta_path.read_text(encoding="utf-8"))
+
+
+def delete_subscription(data_root: str | Path, sub_id: str) -> bool:
+    """Remove a stored subscription directory. Returns True when deleted."""
+    if not re.fullmatch(r"[0-9a-f]{12}", sub_id or ""):
+        raise ValueError("订阅 ID 无效")
+    sub_dir = Path(data_root) / "subscriptions" / sub_id
+    if not sub_dir.is_dir():
+        return False
+    shutil.rmtree(sub_dir)
+    return True
 
 
 def load_nodes(data_root: str | Path, sub_id: str) -> list[dict[str, Any]]:

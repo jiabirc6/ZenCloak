@@ -112,3 +112,21 @@ def test_refresh_subscription_rebuilds_nodes(tmp_path):
     names = [n["name"] for n in refreshed["nodes"]]
     assert "[a] 新加坡-01" in names
     assert "[a] 香港-01" not in names
+
+
+def test_delete_subscription(tmp_path):
+    from zencloak.core.subscriptions import delete_subscription
+
+    meta = import_subscription(SAMPLE, tmp_path, name="待删")
+    assert delete_subscription(tmp_path, meta["id"]) is True
+    assert list_subscriptions(tmp_path) == []
+    assert delete_subscription(tmp_path, meta["id"]) is False
+
+
+def test_delete_subscription_rejects_bad_id(tmp_path):
+    import pytest
+
+    from zencloak.core.subscriptions import delete_subscription
+
+    with pytest.raises(ValueError, match="订阅 ID 无效"):
+        delete_subscription(tmp_path, "../../etc")

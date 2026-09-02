@@ -19,6 +19,7 @@ from zencloak.core.models import normalize_start_url
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionError, SessionManager
 from zencloak.core.subscriptions import (
+    delete_subscription,
     get_subscription,
     import_subscription,
     list_subscriptions,
@@ -295,6 +296,23 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - network failures surface to UI
             raise HTTPException(status_code=502, detail=f"刷新失败: {exc}") from exc
+
+    @app.delete("/api/proxy/subscriptions/{sub_id}")
+    def proxy_delete_subscription(sub_id: str) -> dict:
+        if get_subscription(proxy_root(), sub_id) is None:
+            raise HTTPException(status_code=404, detail="订阅不存在")
+        users = [
+            profile["name"]
+            for profile in store.list_profiles()
+            if profile.get("proxy_subscription_id") == sub_id
+        ]
+        if users:
+            raise HTTPException(
+                status_code=409,
+                detail=f"该订阅正被 {len(users)} 个档案使用：{'、'.join(users)}",
+            )
+        delete_subscription(proxy_root(), sub_id)
+        return {"ok": True}
 
     @app.post("/api/proxy/nodes/test")
     def proxy_test_node(payload: dict[str, Any]) -> dict:
