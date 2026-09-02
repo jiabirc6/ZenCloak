@@ -203,8 +203,13 @@
                 </select>
               </div>
               <div class="field">
-                <label for="proxyNode">出口节点</label>
-                <select id="proxyNode"></select>
+                <label for="proxyNodeTrigger">出口节点</label>
+                <div class="node-select">
+                  <button type="button" id="proxyNodeTrigger" class="node-trigger" disabled>
+                    <span class="node-name">选择节点</span>
+                  </button>
+                  <div id="proxyNodeList" class="node-list" hidden></div>
+                </div>
               </div>
               <div class="field full">
                 <button id="proxyTestBtn" class="btn" type="button" title="选了地区则测该地区全部节点，否则只测当前节点">

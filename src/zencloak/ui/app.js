@@ -250,12 +250,12 @@ function renderForm() {
   state.selectedSubscriptionId = profile.proxy_subscription_id || "";
   $("proxySubscription").value = state.selectedSubscriptionId || "";
   $("proxyRegion").value = profile.proxy_region || "";
-  $("proxyNode").value = profile.proxy_node || "";
+  setNodeValue(profile.proxy_node);
   setProxyBuiltinEnabled(builtinProxy);
   if (state.selectedSubscriptionId) {
     loadNodes(state.selectedSubscriptionId).then(() => {
       $("proxyRegion").value = profile.proxy_region || "";
-      $("proxyNode").value = profile.proxy_node || "";
+      setNodeValue(profile.proxy_node);
     });
   } else {
     state.nodes = [];
@@ -308,7 +308,7 @@ function setProxyBuiltinEnabled(enabled) {
   $("proxyImportBtn").disabled = !enabled;
   $("proxySubscription").disabled = !enabled;
   $("proxyRegion").disabled = !enabled;
-  $("proxyNode").disabled = !enabled;
+  setNodeDisabled(!enabled);
   $("proxyTestBtn").disabled = !enabled;
   $("proxyRefreshBtn").disabled = !enabled;
   $("proxyDeleteBtn").disabled = !enabled;
@@ -352,32 +352,62 @@ function renderSubscriptionOptions() {
   }
 }
 
+function nodeLatencyHtml(name) {
+  const latency = state.nodeLatency[name];
+  if (!latency) return "";
+  if (latency.error) return `<span class="node-latency fail">连接失败</span>`;
+  return `<span class="node-latency ok">${escapeHtml(latency.ms)} ms</span>`;
+}
+
+function getNodeValue() {
+  return state.selectedNode || "";
+}
+
+function setNodeValue(name) {
+  state.selectedNode = name || "";
+  renderNodeOptions();
+}
+
+function setNodeDisabled(disabled) {
+  $("proxyNodeTrigger").disabled = disabled;
+  if (disabled) closeNodeList();
+}
+
 function renderNodeOptions() {
   const region = $("proxyRegion").value;
-  const select = $("proxyNode");
-  select.innerHTML = "";
   const filtered = region
     ? state.nodes.filter((node) => node.region === region)
     : state.nodes;
-  const empty = document.createElement("option");
-  empty.value = "";
-  empty.textContent = filtered.length ? `选择节点（${filtered.length} 个）` : "选择节点";
-  select.appendChild(empty);
-  for (const node of filtered) {
-    const option = document.createElement("option");
-    option.value = node.name;
-    const latency = state.nodeLatency[node.name];
-    let suffix = ` · ${node.type || "?"}${node.region ? ` · ${regionLabel(node.region)}` : ""}`;
-    if (latency && latency.error) {
-      suffix += " · 连接失败";
-      option.style.color = "#b4232c";
-    } else if (latency) {
-      suffix += ` · ${latency.ms}ms`;
-      option.style.color = "#177245";
-    }
-    option.textContent = `${node.name}${suffix}`;
-    select.appendChild(option);
+  if (!filtered.some((node) => node.name === state.selectedNode)) {
+    state.selectedNode = "";
   }
+  const trigger = $("proxyNodeTrigger");
+  trigger.innerHTML = state.selectedNode
+    ? `<span class="node-name">${escapeHtml(state.selectedNode)}</span>${nodeLatencyHtml(state.selectedNode)}`
+    : `<span class="node-name placeholder">${filtered.length ? `选择节点（${filtered.length} 个）` : "选择节点"}</span>`;
+  const list = $("proxyNodeList");
+  list.innerHTML = "";
+  for (const node of filtered) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "node-row" + (node.name === state.selectedNode ? " active" : "");
+    row.innerHTML =
+      `<span class="node-name">${escapeHtml(node.name)}</span>` +
+      `<span class="node-meta">${escapeHtml(node.type || "")}${node.region ? ` · ${escapeHtml(regionLabel(node.region))}` : ""}</span>` +
+      nodeLatencyHtml(node.name);
+    row.addEventListener("click", () => {
+      state.selectedNode = node.name;
+      markFormDirty();
+      renderNodeOptions();
+      closeNodeList();
+    });
+    list.appendChild(row);
+  }
+}
+
+function closeNodeList() {
+  const list = $("proxyNodeList");
+  if (list) list.hidden = true;
 }
 
 function renderRegionOptions() {
@@ -499,7 +529,7 @@ async function deleteSubscription() {
 
 async function testNode() {
   const subId = $("proxySubscription").value;
-  const node = $("proxyNode").value;
+  const node = getNodeValue();
   const region = $("proxyRegion").value;
   if (!subId) return;
   const targets = region
@@ -545,7 +575,6 @@ async function testNode() {
         : `已测 ${response.results.length} 个，全部连接失败`;
     }
     renderNodeOptions();
-    if (node) $("proxyNode").value = node;
   } catch (error) {
     toast(error.message, true);
     status.textContent = "";
@@ -707,7 +736,7 @@ function readForm() {
     proxy_mode: builtinProxy ? "mihomo" : "manual",
     proxy_subscription_id: builtinProxy ? $("proxySubscription").value || null : null,
     proxy_region: builtinProxy ? $("proxyRegion").value || null : null,
-    proxy_node: builtinProxy ? $("proxyNode").value || null : null,
+    proxy_node: builtinProxy ? getNodeValue() || null : null,
     proxy: proxyEnabled
       ? {
           type: $("proxyType").value,
@@ -1110,7 +1139,13 @@ function bindEvents() {
     renderNodeOptions();
     markFormDirty();
   });
-  $("proxyNode").addEventListener("change", markFormDirty);
+  $("proxyNodeTrigger").addEventListener("click", () => {
+    const list = $("proxyNodeList");
+    list.hidden = !list.hidden;
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".node-select")) closeNodeList();
+  });
   $("proxyTestBtn").addEventListener("click", testNode);
   $("proxyRefreshBtn").addEventListener("click", refreshSubscription);
   $("proxyDeleteBtn").addEventListener("click", deleteSubscription);
