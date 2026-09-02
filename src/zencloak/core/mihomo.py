@@ -4,8 +4,10 @@ import secrets
 import shutil
 import subprocess
 import time
+import urllib.parse
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -281,3 +283,39 @@ class ProxyManager:
         opener = urllib.request.build_opener(proxy_handler)
         with opener.open("http://api.ipify.org", timeout=timeout) as response:
             return response.read().decode("utf-8").strip()
+
+    SPEEDTEST_ID = "__speedtest__"
+
+    def test_nodes(
+        self,
+        nodes: list[dict[str, Any]],
+        url: str = "http://www.gstatic.com/generate_204",
+        timeout_ms: int = 5000,
+        workers: int = 16,
+    ) -> list[dict[str, Any]]:
+        """Measure real proxy latency for nodes via a temporary mihomo core.
+
+        Uses the controller's ``/proxies/{name}/delay`` endpoint — the same
+        mechanism Clash-family clients use — so the number reflects a full
+        HTTP round trip through the proxy, not a local TCP handshake.
+        """
+        if not nodes:
+            return []
+        handle = self.start(self.SPEEDTEST_ID, nodes)
+        try:
+            def probe(node: dict[str, Any]) -> dict[str, Any]:
+                name = str(node.get("name"))
+                path = (
+                    f"/proxies/{urllib.parse.quote(name, safe='')}/delay"
+                    f"?url={urllib.parse.quote(url, safe=':/?=&')}&timeout={timeout_ms}"
+                )
+                try:
+                    data = self._controller_request(handle, "GET", path)
+                    return {"node": name, "delay_ms": data.get("delay"), "error": None}
+                except Exception as exc:  # noqa: BLE001 - per-node failures are data
+                    return {"node": name, "delay_ms": None, "error": str(exc)}
+
+            with ThreadPoolExecutor(max_workers=min(workers, max(1, len(nodes)))) as pool:
+                return list(pool.map(probe, nodes))
+        finally:
+            self.stop(self.SPEEDTEST_ID)

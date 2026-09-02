@@ -611,8 +611,34 @@ proxies:
     assert response.status_code == 404
 
 
-def test_proxy_nodes_test_batch(client, monkeypatch):
-    api_client, _, _ = client
+class SpeedTestManager(FakeProxyManager):
+    def __init__(self):
+        self.calls = []
+
+    def test_nodes(self, nodes, url=None, timeout_ms=5000, workers=16):
+        self.calls.append([n["name"] for n in nodes])
+        return [
+            {
+                "node": n["name"],
+                "delay_ms": 12.3 if n["name"] == "快节点" else None,
+                "error": None if n["name"] == "快节点" else "timeout",
+            }
+            for n in nodes
+        ]
+
+
+def _speedtest_client(tmp_path):
+    store = ProfileStore(tmp_path, auto_init=True)
+    manager = SpeedTestManager()
+    api_client = TestClient(
+        create_app(store, FakeSessions(), api_token="test-token", proxy_manager=manager)
+    )
+    api_client.headers.update({"Authorization": "Bearer test-token"})
+    return api_client, manager
+
+
+def test_proxy_nodes_test_batch(tmp_path):
+    api_client, manager = _speedtest_client(tmp_path)
     source = """
 proxies:
   - {name: 快节点, type: vless, server: 1.2.3.4, port: 443}
@@ -621,10 +647,6 @@ proxies:
     meta = api_client.post(
         "/api/proxy/subscriptions/import", json={"source": source}
     ).json()
-    monkeypatch.setattr(
-        "zencloak.api._tcp_latency",
-        lambda node: (12.3, None) if node["name"] == "快节点" else (None, "timeout"),
-    )
     response = api_client.post(
         "/api/proxy/nodes/test-batch",
         json={
@@ -639,6 +661,30 @@ proxies:
     assert results["慢节点"]["latency_ms"] is None
     assert results["慢节点"]["error"] == "timeout"
     assert "不存在的节点" not in results
+    assert manager.calls == [["快节点", "慢节点"]]
+
+
+def test_proxy_node_test_single(tmp_path):
+    api_client, _ = _speedtest_client(tmp_path)
+    source = """
+proxies:
+  - {name: 快节点, type: vless, server: 1.2.3.4, port: 443}
+"""
+    meta = api_client.post(
+        "/api/proxy/subscriptions/import", json={"source": source}
+    ).json()
+    response = api_client.post(
+        "/api/proxy/nodes/test",
+        json={"subscription_id": meta["id"], "node": "快节点"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"node": "快节点", "latency_ms": 12.3}
+
+    response = api_client.post(
+        "/api/proxy/nodes/test",
+        json={"subscription_id": meta["id"], "node": "慢节点"},
+    )
+    assert response.status_code == 404
 
 
 def test_proxy_nodes_test_batch_requires_list(client):

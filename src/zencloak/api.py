@@ -1,9 +1,7 @@
 import os
-import socket
 import threading
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -321,38 +319,39 @@ def create_app(
         node_name = payload.get("node")
         if not sub_id or not node_name:
             raise HTTPException(status_code=400, detail="缺少订阅或节点")
+        manager = require_proxy_manager()
         nodes = load_nodes(proxy_root(), sub_id)
         node = next((item for item in nodes if item.get("name") == node_name), None)
         if node is None:
             raise HTTPException(status_code=404, detail="节点不存在")
-        latency_ms, error = _tcp_latency(node)
-        if error:
-            raise HTTPException(status_code=502, detail=f"节点连接失败: {error}")
-        return {"node": node_name, "latency_ms": latency_ms}
+        result = manager.test_nodes([node])[0]
+        if result["error"]:
+            raise HTTPException(status_code=502, detail=f"节点连接失败: {result['error']}")
+        return {"node": node_name, "latency_ms": result["delay_ms"]}
 
     @app.post("/api/proxy/nodes/test-batch")
     def proxy_test_nodes_batch(payload: dict[str, Any]) -> dict:
-        """Concurrently TCP-probe several nodes; never fails per-node errors."""
+        """Real proxy latency for several nodes via a temporary mihomo core."""
         sub_id = payload.get("subscription_id")
         names = payload.get("nodes")
         if not sub_id or not isinstance(names, list) or not names:
             raise HTTPException(status_code=400, detail="缺少订阅或节点列表")
+        manager = require_proxy_manager()
         wanted = set(names)
         nodes = [
             item
             for item in load_nodes(proxy_root(), sub_id)
             if item.get("name") in wanted
         ]
-        with ThreadPoolExecutor(max_workers=min(16, max(1, len(nodes)))) as pool:
-            latencies = list(pool.map(_tcp_latency, nodes))
+        results = manager.test_nodes(nodes)
         return {
             "results": [
                 {
-                    "node": item.get("name"),
-                    "latency_ms": latency_ms,
-                    "error": error,
+                    "node": item["node"],
+                    "latency_ms": item["delay_ms"],
+                    "error": item["error"],
                 }
-                for item, (latency_ms, error) in zip(nodes, latencies)
+                for item in results
             ]
         }
 
@@ -494,20 +493,6 @@ def create_app(
     if (UI_DIR / "index.html").exists():
         app.mount("/", StaticFiles(directory=UI_DIR, html=True), name="ui")
     return app
-
-
-def _tcp_latency(node: dict) -> tuple[float | None, str | None]:
-    """TCP-connect latency for a node; returns (ms, error)."""
-    server = node.get("server")
-    port = node.get("port")
-    if not server or not port:
-        return None, "节点缺少 server/port"
-    started = time.perf_counter()
-    try:
-        with socket.create_connection((server, int(port)), timeout=6):
-            return round((time.perf_counter() - started) * 1000, 1), None
-    except OSError as exc:
-        return None, str(exc)
 
 
 def _engine_info() -> dict:
