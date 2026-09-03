@@ -28,6 +28,37 @@ class MihomoError(RuntimeError):
     """Raised when the mihomo core cannot be prepared or started."""
 
 
+MIHOMO_PID_FILE = "mihomo.pid"
+
+
+def _terminate_mihomo_pid(pid: int) -> bool:
+    """Kill a stale mihomo process by PID, verifying its image path first.
+
+    Returns True if a mihomo process was terminated. A PID that no longer
+    exists, or that now belongs to an unrelated process (PID reuse), is
+    left untouched.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.windll.kernel32
+    query_limited = 0x1000
+    terminate = 0x0001
+    handle = kernel32.OpenProcess(query_limited | terminate, False, pid)
+    if not handle:
+        return False
+    try:
+        buf = ctypes.create_unicode_buffer(1024)
+        size = wintypes.DWORD(len(buf))
+        if not kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+            return False
+        if Path(buf.value).name.lower() != "mihomo.exe":
+            return False
+        return bool(kernel32.TerminateProcess(handle, 1))
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def _default_bin_dir() -> Path:
     return Path.home() / ".zencloak" / "bin"
 
@@ -168,6 +199,7 @@ class ProxyManager:
             stderr=subprocess.STDOUT,
             creationflags=0x08000000,
         )
+        (work_dir / MIHOMO_PID_FILE).write_text(str(process.pid), encoding="ascii")
         handle = ProxyHandle(
             profile_id=profile_id,
             mixed_port=ports[0],
@@ -207,6 +239,41 @@ class ProxyManager:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+        try:
+            (handle.work_dir / MIHOMO_PID_FILE).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    def stop_all(self) -> None:
+        for profile_id in list(self._handles):
+            self.stop(profile_id)
+
+    def sweep_orphans(self) -> int:
+        """Kill mihomo processes left behind by a force-killed previous run.
+
+        Safe to call at startup: the single-instance lock guarantees no other
+        ZenCloak is running, so any live mihomo whose PID file sits in our
+        runtime dir is an orphan. The PID is verified against the process
+        image path before killing, so PID reuse cannot hurt an unrelated
+        process.
+        """
+        killed = 0
+        runtime_root = self.data_root / "runtime"
+        if not runtime_root.is_dir():
+            return 0
+        for work_dir in runtime_root.iterdir():
+            pid_file = work_dir / MIHOMO_PID_FILE
+            if not pid_file.is_file():
+                continue
+            try:
+                pid = int(pid_file.read_text(encoding="ascii").strip())
+            except (OSError, ValueError):
+                pid_file.unlink(missing_ok=True)
+                continue
+            if _terminate_mihomo_pid(pid):
+                killed += 1
+            pid_file.unlink(missing_ok=True)
+        return killed
 
     def status(self, profile_id: str) -> dict[str, Any]:
         handle = self._handles.get(profile_id)

@@ -82,3 +82,42 @@ def test_test_nodes_empty_returns_empty(tmp_path):
     from zencloak.core.mihomo import ProxyManager
 
     assert ProxyManager(tmp_path).test_nodes([]) == []
+
+
+def test_sweep_orphans_cleans_stale_and_dead_pid_files(tmp_path):
+    from zencloak.core.mihomo import MIHOMO_PID_FILE, ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+    runtime = tmp_path / "runtime"
+    # 不存在的 PID：只清文件，不杀任何东西
+    (runtime / "aaaa11112222").mkdir(parents=True)
+    (runtime / "aaaa11112222" / MIHOMO_PID_FILE).write_text("999999", encoding="ascii")
+    # 坏文件：直接删
+    (runtime / "bbbb11112222").mkdir(parents=True)
+    (runtime / "bbbb11112222" / MIHOMO_PID_FILE).write_text("not-a-pid", encoding="ascii")
+    assert manager.sweep_orphans() == 0
+    assert not (runtime / "aaaa11112222" / MIHOMO_PID_FILE).exists()
+    assert not (runtime / "bbbb11112222" / MIHOMO_PID_FILE).exists()
+
+
+def test_sweep_orphans_never_kills_unrelated_process(tmp_path):
+    """PID 复用防护：指向当前 python 进程的 PID 文件绝不能被杀。"""
+    import os
+
+    from zencloak.core.mihomo import MIHOMO_PID_FILE, ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+    runtime = tmp_path / "runtime"
+    (runtime / "cccc11112222").mkdir(parents=True)
+    (runtime / "cccc11112222" / MIHOMO_PID_FILE).write_text(str(os.getpid()), encoding="ascii")
+    assert manager.sweep_orphans() == 0
+    assert os.getpid()  # 进程还活着（测试本身即证明）
+    assert not (runtime / "cccc11112222" / MIHOMO_PID_FILE).exists()
+
+
+def test_stop_all_pops_all_handles(tmp_path):
+    from zencloak.core.mihomo import ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+    manager.stop_all()  # 空句柄不报错
+    assert manager._handles == {}

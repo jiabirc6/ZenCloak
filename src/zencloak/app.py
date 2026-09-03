@@ -91,7 +91,7 @@ def _show_already_running() -> None:
         pass
 
 
-def _build_tray(window, sessions, server):
+def _build_tray(window, sessions, server, proxy_manager=None):
     """Create a system-tray icon whose Exit item fully terminates ZenCloak."""
     try:
         import pystray
@@ -109,6 +109,13 @@ def _build_tray(window, sessions, server):
             sessions.stop_all(wait=False)
         except Exception:
             pass
+        # os._exit skips the session threads' finally blocks, so mihomo
+        # children must be reaped synchronously here or they leak.
+        if proxy_manager is not None:
+            try:
+                proxy_manager.stop_all()
+            except Exception:
+                pass
         try:
             server.should_exit = True
         except Exception:
@@ -182,6 +189,10 @@ def main(argv: list[str] | None = None) -> None:
 
     store = ProfileStore(args.data_dir, auto_init=True)
     proxy_manager = ProxyManager(data_root=store.data_dir / "proxy")
+    try:
+        proxy_manager.sweep_orphans()
+    except Exception:
+        pass
     sessions = SessionManager(
         data_root=store.data_dir,
         proxy_manager=proxy_manager,
@@ -221,7 +232,7 @@ def main(argv: list[str] | None = None) -> None:
                 js_api=ApiBridge(api_token),
             )
 
-            tray = _build_tray(window, sessions, server)
+            tray = _build_tray(window, sessions, server, proxy_manager)
             if tray is not None:
                 tray.run_detached()
 
