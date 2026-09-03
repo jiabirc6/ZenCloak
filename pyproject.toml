@@ -18,6 +18,7 @@ dependencies = [
     "pystray>=0.19",
     "pywebview>=6.0",
     "PyYAML>=6.0",
+    "pyzipper>=0.3",
     "uvicorn>=0.49",
 ]
 
