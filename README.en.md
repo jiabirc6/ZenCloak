@@ -27,6 +27,7 @@ Download `ZenCloak-Setup-*.exe` and run it — no admin rights required. On firs
 - Encrypted full backup: all profiles + login state into an AES-256 passphrase-protected archive
 - Built-in entries to BrowserScan, FingerprintJS, BrowserLeaks and Incolumitas
 - MCP server: let AI assistants (ZCode / Claude Desktop / Cursor) drive the browser directly (see [docs/mcp.md](docs/mcp.md))
+- CDP attach mode: external Playwright / Selenium scripts can attach to a running profile (see [docs/attach.md](docs/attach.md))
 - Local API bound to `127.0.0.1` on a random port, Bearer-token protected
 - First run auto-creates a "Local" profile matching your machine (Windows / Asia/Shanghai / zh-CN)
 

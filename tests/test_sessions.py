@@ -558,3 +558,26 @@ def test_sweep_does_not_multiply_when_closes_are_ignored(tmp_path):
     monkeypatch.undo()
     assert len(context.pages) == 3  # 无增殖（原 1 空白 + 2 NTP 原样保留）
     assert cdp.created == 0  # 一次都没补建
+
+
+def test_launch_cdp_attach_exposes_endpoint(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["cdp_attach"] = True
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    args = contexts[0][0]["args"]
+    port_arg = next(arg for arg in args if arg.startswith("--remote-debugging-port="))
+    port = port_arg.split("=")[1]
+    assert port.isdigit()
+    status = manager.status("aaaaaaaaaaaa")
+    assert status["cdp_endpoint"] == f"http://127.0.0.1:{port}"
+
+
+def test_launch_without_cdp_attach_has_no_debug_port(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    args = contexts[0][0]["args"]
+    assert not any(arg.startswith("--remote-debugging-port=") for arg in args)
+    assert manager.status("aaaaaaaaaaaa")["cdp_endpoint"] is None

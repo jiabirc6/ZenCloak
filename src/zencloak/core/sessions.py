@@ -11,6 +11,7 @@ from cloakbrowser import launch_persistent_context
 
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
 from .health import PROBE_JS
+from .proxy_runtime import allocate_ports
 
 
 class SessionError(RuntimeError):
@@ -91,6 +92,7 @@ class SessionManager:
                 "urls": Queue(),
                 "context": None,
                 "thread": None,
+                "cdp_port": None,
             }
             self._sessions[profile_id] = session
         thread = threading.Thread(
@@ -181,8 +183,11 @@ class SessionManager:
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
             proxy_server = self._start_proxy(profile)
+            cdp_port = allocate_ports(1)[0] if profile.get("cdp_attach") else None
+            with self._lock:
+                session["cdp_port"] = cdp_port
             context = self._launcher(
-                **self._build_launch_kwargs(profile, proxy_server)
+                **self._build_launch_kwargs(profile, proxy_server, cdp_port)
             )
             with self._lock:
                 session["context"] = context
@@ -295,17 +300,23 @@ class SessionManager:
                 "started_at": None,
                 "stopped_at": None,
                 "error": None,
+                "cdp_endpoint": None,
             }
+        port = session.get("cdp_port")
         return {
             "profile_id": profile_id,
             "status": session["status"],
             "started_at": session["started_at"],
             "stopped_at": session["stopped_at"],
             "error": session["error"],
+            "cdp_endpoint": f"http://127.0.0.1:{port}" if port else None,
         }
 
     def _build_launch_kwargs(
-        self, profile: dict, proxy_server: str | None = None
+        self,
+        profile: dict,
+        proxy_server: str | None = None,
+        cdp_port: int | None = None,
     ) -> dict:
         args = [
             f"--fingerprint={profile['seed']}",
@@ -317,6 +328,8 @@ class SessionManager:
             f"--disable-features={_DISABLE_FEATURES_WITHOUT_TRANSLATE}",
             "--enable-features=Translate",
         ]
+        if cdp_port:
+            args.append(f"--remote-debugging-port={cdp_port}")
         if profile.get("user_agent"):
             args.append(f"--user-agent={profile['user_agent']}")
         kwargs: dict[str, Any] = {

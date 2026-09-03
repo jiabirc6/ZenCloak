@@ -71,6 +71,7 @@ class Profile(BaseModel):
     humanize: bool = False
     human_preset: Literal["default", "careful", "quick"] = "default"
     translate_button: bool = False
+    cdp_attach: bool = False
     start_url: str | None = None
     headless: bool = False
     created_at: str

@@ -31,6 +31,7 @@ ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档�
 - 加密全量备份：全部档案 + 登录态打包为口令保护的 AES-256 压缩包
 - 内置 BrowserScan、FingerprintJS、BrowserLeaks、Incolumitas 检测站点入口
 - MCP Server：ZCode / Claude Desktop / Cursor 等 AI 助手直接操控指纹浏览器（见 [docs/mcp.md](docs/mcp.md)）
+- CDP attach 模式：外部 Playwright / Selenium 脚本可直接接入运行中的档案（见 [docs/attach.md](docs/attach.md)）
 - 本地 API 只监听 `127.0.0.1` 随机端口，Bearer 令牌鉴权
 - 首次启动自动创建「本地档案」，默认匹配本机 Windows / Asia/Shanghai / zh-CN
 
