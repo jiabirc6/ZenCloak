@@ -244,6 +244,7 @@ function renderForm() {
   $("userAgent").value = profile.user_agent || "";
   $("humanize").checked = Boolean(profile.humanize);
   $("humanPreset").value = profile.human_preset || "default";
+  $("translateButton").checked = Boolean(profile.translate_button);
   const proxy = profile.proxy;
   const builtinProxy = Boolean(profile.proxy_enabled) && profile.proxy_mode === "mihomo";
   $("proxyBuiltin").checked = builtinProxy;
@@ -755,6 +756,7 @@ function readForm() {
       : null,
     humanize: $("humanize").checked,
     human_preset: $("humanPreset").value,
+    translate_button: $("translateButton").checked,
     headless: false,
   };
 }

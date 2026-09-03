@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -54,10 +55,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 """
 
 
-def _content_js() -> str:
+def _content_js(host_id: str) -> str:
+    """Floating translate button, rendered inside a closed shadow root.
+
+    The page side only ever sees a bare <div id="<host_id>"> with no
+    attributes; the id is derived per profile seed so no constant string
+    (nor any product name) is observable from web pages.
+    """
     return """(() => {
-  if (window.__zencloakTranslateButton) return;
-  window.__zencloakTranslateButton = true;
+  const HOST_ID = "%(host_id)s";
+  if (document.getElementById(HOST_ID)) return;
 
   function translate() {
     const target =
@@ -66,29 +73,26 @@ def _content_js() -> str:
     window.location.href = target;
   }
 
+  const host = document.createElement("div");
+  host.id = HOST_ID;
+  const root = host.attachShadow({ mode: "closed" });
+
+  const style = document.createElement("style");
+  style.textContent =
+    "button{position:fixed;right:18px;bottom:120px;z-index:2147483647;" +
+    "padding:9px 14px;border:0;border-radius:8px;background:#0f766e;" +
+    "color:#fff;font:500 14px/1.2 'Microsoft YaHei','PingFang SC',sans-serif;" +
+    "box-shadow:0 4px 14px rgba(15,118,110,0.35);cursor:grab;opacity:0.35;" +
+    "transition:opacity 0.2s ease;user-select:none}";
+
   const button = document.createElement("button");
-  button.id = "zencloakTranslateBtn";
   button.type = "button";
   button.title = "用 Google 翻译打开本页";
   button.textContent = "翻译本页";
+  root.appendChild(style);
+  root.appendChild(button);
+
   const BOTTOM_GAP = 120;
-  Object.assign(button.style, {
-    position: "fixed",
-    right: "18px",
-    bottom: BOTTOM_GAP + "px",
-    zIndex: "2147483647",
-    padding: "9px 14px",
-    border: "0",
-    borderRadius: "8px",
-    background: "#0f766e",
-    color: "#fff",
-    font: "500 14px/1.2 'Microsoft YaHei', 'PingFang SC', sans-serif",
-    boxShadow: "0 4px 14px rgba(15, 118, 110, 0.35)",
-    cursor: "grab",
-    opacity: "0.35",
-    transition: "opacity 0.2s ease",
-    userSelect: "none"
-  });
 
   function layoutFromAnchors() {
     const rect = button.getBoundingClientRect();
@@ -158,16 +162,28 @@ def _content_js() -> str:
     if (!dragging && button.style.right !== "auto") layoutFromAnchors();
   });
 
-  document.documentElement.appendChild(button);
+  document.documentElement.appendChild(host);
   layoutFromAnchors();
 })();
-"""
+""" % {"host_id": host_id}
+
+
+def _translate_host_id(profile: dict) -> str:
+    seed = profile.get("seed") or profile["id"]
+    digest = hashlib.sha1(f"{seed}:{profile['id']}".encode("utf-8")).hexdigest()
+    return f"zc-{digest[:8]}"
 
 
 def build_newtab_extension(
     profile: dict, data_root: str | Path, dir_name: str = "newtab-v3"
 ) -> Path:
-    """Write the ZenCloak helper extension: blank new tab plus page translate."""
+    """Write the ZenCloak helper extension: blank new tab plus page translate.
+
+    The floating translate button is opt-in (``translate_button``). When off,
+    no content script is registered at all, so web pages observe zero DOM
+    injection; translation stays available via the context menu and the
+    Alt+Shift+T shortcut, neither of which is observable from page JS.
+    """
     ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
     ext_dir.mkdir(parents=True, exist_ok=True)
 
@@ -177,10 +193,19 @@ def build_newtab_extension(
     manifest = {
         "manifest_version": 3,
         "name": "ZenCloak Helper",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "description": "ZenCloak page translation helper.",
         "background": {"service_worker": "background.js"},
-        "content_scripts": [
+        "permissions": ["tabs", "contextMenus"],
+        "commands": {
+            "translate-page": {
+                "suggested_key": {"default": "Alt+Shift+T"},
+                "description": "翻译当前页面",
+            }
+        },
+    }
+    if profile.get("translate_button"):
+        manifest["content_scripts"] = [
             {
                 "matches": ["http://*/*", "https://*/*"],
                 "exclude_matches": [
@@ -190,20 +215,18 @@ def build_newtab_extension(
                 "js": ["content.js"],
                 "run_at": "document_idle",
             }
-        ],
-        "permissions": ["tabs", "contextMenus"],
-        "commands": {
-            "translate-page": {
-                "suggested_key": {"default": "Alt+Shift+T"},
-                "description": "翻译当前页面",
-            }
-        },
-    }
+        ]
     (ext_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     (ext_dir / "background.js").write_text(_background_js(), encoding="utf-8")
-    (ext_dir / "content.js").write_text(_content_js(), encoding="utf-8")
+    content_path = ext_dir / "content.js"
+    if profile.get("translate_button"):
+        content_path.write_text(
+            _content_js(_translate_host_id(profile)), encoding="utf-8"
+        )
+    elif content_path.exists():
+        content_path.unlink()
     return ext_dir
 
 
