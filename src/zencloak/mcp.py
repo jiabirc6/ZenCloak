@@ -106,7 +106,7 @@ def open_url(profile_id: str, url: str) -> str:
     )
 
 
-def list_pages(profile_id: str) -> list[dict]:
+def list_pages(profile_id: str) -> str:
     """列出指定档案浏览器当前打开的标签页（索引、URL、标题）。"""
     return _json_text(_request("GET", f"/api/sessions/{profile_id}/pages"))
 
