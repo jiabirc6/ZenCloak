@@ -2,6 +2,8 @@
 
 [![主页](https://img.shields.io/badge/主页-GitHub%20Pages-black)](https://jiabirc6.github.io/ZenCloak/)
 
+English documentation: [README.en.md](README.en.md)
+
 基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
 
 > 新手请先看：[ZenCloak 新手使用教程](docs/zencloak-tutorial.md)
@@ -26,6 +28,7 @@ ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档�
 - 类人鼠标、键盘、滚动行为（`humanize`）
 - 独立持久化 profile：cookie、登录态、历史数据按档案隔离
 - 一键启动 / 停止浏览器窗口，支持批量启停、回收站、档案导入导出复制
+- 加密全量备份：全部档案 + 登录态打包为口令保护的 AES-256 压缩包
 - 内置 BrowserScan、FingerprintJS、BrowserLeaks、Incolumitas 检测站点入口
 - MCP Server：ZCode / Claude Desktop / Cursor 等 AI 助手直接操控指纹浏览器（见 [docs/mcp.md](docs/mcp.md)）
 - 本地 API 只监听 `127.0.0.1` 随机端口，Bearer 令牌鉴权
