@@ -693,3 +693,42 @@ def test_proxy_nodes_test_batch_requires_list(client):
         "/api/proxy/nodes/test-batch", json={"subscription_id": "x", "nodes": []}
     )
     assert response.status_code == 400
+
+
+def test_backup_export_import_roundtrip(client):
+    api_client, store, _ = client
+    resp = api_client.post("/api/backup/export", json={"passphrase": "test-passphrase-123"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert Path(data["path"]).exists()
+    assert data["profiles"]
+
+    # 同库恢复（multipart 上传）：已有档案默认跳过
+    archive_bytes = Path(data["path"]).read_bytes()
+
+    def _import(passphrase):
+        return api_client.post(
+            "/api/backup/import",
+            files={"file": ("backup.zip", archive_bytes, "application/zip")},
+            data={"passphrase": passphrase},
+        )
+
+    resp = _import("test-passphrase-123")
+    assert resp.status_code == 200
+    assert resp.json()["skipped_existing"]
+
+    # 口令过短 / 口令错误
+    assert (
+        api_client.post("/api/backup/export", json={"passphrase": "x"}).status_code == 400
+    )
+    assert _import("wrong-passphrase-999").status_code == 400
+
+
+def test_backup_export_skips_running_profile(client):
+    api_client, store, sessions = client
+    profile = store.create_profile(_draft("运行中"))
+    sessions.launch(profile)
+    resp = api_client.post("/api/backup/export", json={"passphrase": "test-passphrase-123"})
+    data = resp.json()
+    assert profile["id"] in data["skipped_running"]
+    assert profile["id"] not in data["profiles"]

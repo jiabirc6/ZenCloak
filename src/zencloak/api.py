@@ -1,4 +1,5 @@
 import os
+import tempfile
 import threading
 import time
 import urllib.request
@@ -6,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from cloakbrowser.config import get_binary_path, get_effective_version
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from zencloak.core.backup import BackupError, create_backup, restore_backup
 from zencloak.core.consistency import ConsistencyError, check_consistency, lookup_ip_geo
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.health import build_report
@@ -169,6 +171,58 @@ def create_app(
         if not deleted:
             raise HTTPException(status_code=404, detail="回收站中没有该档案")
         return Response(status_code=204)
+
+    def running_profile_ids() -> list[str]:
+        return [
+            item["profile_id"]
+            for item in sessions.status()
+            if isinstance(item, dict)
+            and item.get("status") not in (None, "stopped", "error")
+        ]
+
+    @app.post("/api/backup/export")
+    def backup_export(payload: dict) -> dict:
+        passphrase = str(payload.get("passphrase") or "")
+        include_data = bool(payload.get("include_data", True))
+        try:
+            return create_backup(
+                store.root,
+                passphrase,
+                include_data=include_data,
+                running_ids=running_profile_ids(),
+            )
+        except BackupError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/backup/import")
+    async def backup_import(
+        file: UploadFile,
+        passphrase: str = Form(""),
+        overwrite: bool = Form(False),
+    ) -> dict:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="备份文件为空")
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        try:
+            tmp.write(content)
+            tmp.close()
+            try:
+                result = restore_backup(
+                    tmp.name,
+                    passphrase,
+                    store.root,
+                    running_ids=running_profile_ids(),
+                    overwrite=overwrite,
+                )
+            except BackupError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        finally:
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
+        return result
 
     @app.get("/api/sessions")
     def list_sessions() -> list[dict]:
