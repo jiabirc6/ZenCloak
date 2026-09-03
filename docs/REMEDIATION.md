@@ -5,20 +5,20 @@
 
 ## 优先级总览
 
-| 级别 | 项 | 一句话 | 工作量 |
-|---|---|---|---|
-| P0 | R1 翻译按钮 DOM 泄露 | 所有档案注入同一个 `#zencloakTranslateBtn`，一行 JS 即可识别 ZenCloak 并关联全部档案 | 小 |
-| P1 | R2 内核可插拔 | CloakBrowser 闭源+商业条款风险，launcher 注入点已有，补第二后端 | 中 |
-| P1 | R3 Playwright 漂移加固 | Translate hack 已有测试断言，补版本 pin | 极小 |
-| P2 | R4 加密备份 | 登录态是全产品最贵资产，备份从"近期候选"提级 | 中 |
-| P2 | R5 跨平台解锁 | 先放宽 Win10；macOS/Linux 需先验证内核可用性再动 | 小→大 |
-| P2 | R6 指纹克隆 | 从本机真实浏览器采集生成档案 | 中 |
-| P2 | R7 CDP attach 模式 | 给外部 Playwright/Selenium 脚本暴露调试端口 | 小 |
-| P3 | R8 app.js 拆分 | 1209 行单文件，新功能进来前先模块化 | 中 |
-| P3 | R9 英文 README | 零成本海外流量 | 极小 |
-| P3 | R10 onedir 默认发布 | 20s 启动劝退问题 | 小 |
-| 快赢 | R11 list_pages MCP 校验 bug | 今天实测发现：返回 JSON 字符串导致 Pydantic 报错 | 极小 |
-| 快赢 | R12 mihomo 强杀残留 | 托盘退出 os._exit 路径留孤儿进程 | 小 |
+| 级别 | 项 | 一句话 | 工作量 | 状态 |
+|---|---|---|---|---|
+| P0 | R1 翻译按钮 DOM 泄露 | 所有档案注入同一个 `#zencloakTranslateBtn`，一行 JS 即可识别 ZenCloak 并关联全部档案 | 小 | ✅ 已修（60cecd5） |
+| P1 | R2 内核可插拔 | CloakBrowser 闭源+商业条款风险，launcher 注入点已有，补第二后端 | 中 | ⏸ 用户待定 |
+| P1 | R3 Playwright 漂移加固 | Translate hack 已有测试断言，补版本 pin | 极小 | ✅ 已修（741be57） |
+| P2 | R4 加密备份 | 登录态是全产品最贵资产，备份从"近期候选"提级 | 中 | 待做 |
+| P2 | R5 跨平台解锁 | 第一步放宽 Win10 已完成；macOS/Linux 需先验证内核可用性 | 小→大 | 第一步 ✅（5ece8ab） |
+| P2 | R6 指纹克隆 | 从本机真实浏览器采集生成档案 | 中 | 待做 |
+| P2 | R7 CDP attach 模式 | 给外部 Playwright/Selenium 脚本暴露调试端口 | 小 | 待做 |
+| P3 | R8 app.js 拆分 | 1209 行单文件，新功能进来前先模块化 | 中 | 待做 |
+| P3 | R9 英文 README | 零成本海外流量 | 极小 | 待做 |
+| P3 | R10 onedir 默认发布 | 20s 启动劝退问题 | 小 | 待做 |
+| 快赢 | R11 list_pages MCP 校验 bug | 今天实测发现：返回 JSON 字符串导致 Pydantic 报错 | 极小 | ✅ 已修（63cb4d9） |
+| 快赢 | R12 mihomo 强杀残留 | 托盘退出 os._exit 路径留孤儿进程 | 小 | ✅ 已修（af9d05b） |
 
 ---
 
