@@ -33,7 +33,7 @@ ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档�
 
 ## 环境要求
 
-- Windows 11
+- Windows 10 / 11（x64）
 - Python 3.12（仅开发模式需要）
 - Node.js 不需要，但本机需要可用的 CloakBrowser binary
 
