@@ -973,6 +973,26 @@ textarea {
   font-weight: 650;
 }
 
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.modal-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .health-summary {
   display: flex;
   gap: 8px;

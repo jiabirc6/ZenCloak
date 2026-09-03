@@ -31,12 +31,19 @@
       <input id="importFile" type="file" accept=".json,application/json" hidden>
       <nav id="profileList" class="profile-list" aria-label="指纹档案"></nav>
       <div class="sidebar-foot">
+        <button id="backupBtn" class="btn foot-btn" type="button" title="加密备份全部档案">
+          <i data-lucide="folder-down"></i>备份
+        </button>
+        <button id="restoreBtn" class="btn foot-btn" type="button" title="从加密备份恢复">
+          <i data-lucide="archive-restore"></i>恢复
+        </button>
         <button id="recycleBinBtn" class="btn foot-btn" type="button">
           <i data-lucide="trash-2"></i>回收站
         </button>
         <button id="quitBtn" class="btn foot-btn" type="button">
           <i data-lucide="power"></i>退出
         </button>
+        <input id="backupFile" type="file" accept=".zip,application/zip" hidden>
         <div class="engine-row">
           <span id="engineDot" class="dot"></span>
           <span id="engineVersion">CloakBrowser</span>
@@ -303,6 +310,59 @@
       </div>
       <div id="healthSummary" class="health-summary"></div>
       <div id="healthList" class="health-list"></div>
+    </div>
+  </div>
+  <div id="backupModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>加密备份</h2>
+        <button id="backupCloseBtn" class="btn" type="button"><i data-lucide="x"></i>关闭</button>
+      </div>
+      <div class="modal-body">
+        <div class="field full">
+          <label for="backupPass">备份口令（至少 8 位，丢失后无法恢复）</label>
+          <input id="backupPass" type="password" autocomplete="new-password">
+        </div>
+        <div class="field full">
+          <label for="backupPass2">确认口令</label>
+          <input id="backupPass2" type="password" autocomplete="new-password">
+        </div>
+        <div class="field full toggle-field">
+          <label class="toggle">
+            <input id="backupIncludeData" type="checkbox" checked>
+            <span>包含浏览器数据（登录态 / Cookie，体积较大）</span>
+          </label>
+        </div>
+        <p class="modal-hint">备份保存到 ~/.zencloak/backups/，运行中的档案会自动跳过。</p>
+        <div class="modal-actions">
+          <button id="backupRunBtn" class="btn primary" type="button"><i data-lucide="folder-down"></i>开始备份</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="restoreModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>恢复备份</h2>
+        <button id="restoreCloseBtn" class="btn" type="button"><i data-lucide="x"></i>关闭</button>
+      </div>
+      <div class="modal-body">
+        <p id="restoreFileName" class="modal-hint"></p>
+        <div class="field full">
+          <label for="restorePass">备份口令</label>
+          <input id="restorePass" type="password" autocomplete="new-password">
+        </div>
+        <div class="field full toggle-field">
+          <label class="toggle">
+            <input id="restoreOverwrite" type="checkbox">
+            <span>覆盖同名档案（默认跳过已存在的）</span>
+          </label>
+        </div>
+        <p class="modal-hint">跨机器恢复后，代理密码需在各档案内重新输入一次。</p>
+        <div class="modal-actions">
+          <button id="restoreRunBtn" class="btn primary" type="button"><i data-lucide="archive-restore"></i>开始恢复</button>
+        </div>
+      </div>
     </div>
   </div>
   <div id="toast" class="toast" role="status"></div>

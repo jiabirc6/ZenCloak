@@ -1112,6 +1112,90 @@ function closeHealthModal() {
   $("healthModal").hidden = true;
 }
 
+/* ===== Backup / Restore ===== */
+
+async function uploadApi(path, formData) {
+  const token = await getApiToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const response = await fetch(path, { method: "POST", headers, body: formData });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error((data && (data.detail || data.message)) || `请求失败 (${response.status})`);
+  }
+  return data;
+}
+
+function openBackupModal() {
+  $("backupPass").value = "";
+  $("backupPass2").value = "";
+  $("backupModal").hidden = false;
+}
+
+async function runBackup() {
+  const pass = $("backupPass").value;
+  if (pass.length < 8) {
+    toast("口令至少 8 位", true);
+    return;
+  }
+  if (pass !== $("backupPass2").value) {
+    toast("两次口令不一致", true);
+    return;
+  }
+  $("backupRunBtn").disabled = true;
+  try {
+    const result = await api("/api/backup/export", {
+      method: "POST",
+      body: JSON.stringify({
+        passphrase: pass,
+        include_data: $("backupIncludeData").checked,
+      }),
+    });
+    const skipped = result.skipped_running.length
+      ? `（跳过 ${result.skipped_running.length} 个运行中）`
+      : "";
+    toast(`备份完成${skipped}：${result.path}`);
+    $("backupModal").hidden = true;
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    $("backupRunBtn").disabled = false;
+  }
+}
+
+function openRestoreModal(file) {
+  state.pendingRestoreFile = file;
+  const sizeMb = Math.round((file.size / 1048576) * 10) / 10;
+  $("restoreFileName").textContent = `已选择：${file.name}（${sizeMb} MB）`;
+  $("restorePass").value = "";
+  $("restoreOverwrite").checked = false;
+  $("restoreModal").hidden = false;
+}
+
+async function runRestore() {
+  const file = state.pendingRestoreFile;
+  if (!file) return;
+  $("restoreRunBtn").disabled = true;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("passphrase", $("restorePass").value);
+    form.append("overwrite", String($("restoreOverwrite").checked));
+    const result = await uploadApi("/api/backup/import", form);
+    const parts = [`恢复 ${result.restored.length} 个档案`];
+    if (result.data_restored.length) parts.push(`含 ${result.data_restored.length} 份登录态`);
+    if (result.skipped_existing.length) parts.push(`跳过已存在 ${result.skipped_existing.length}`);
+    if (result.skipped_running.length) parts.push(`跳过运行中 ${result.skipped_running.length}`);
+    toast(parts.join("，"));
+    $("restoreModal").hidden = true;
+    state.pendingRestoreFile = null;
+    await loadProfiles();
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    $("restoreRunBtn").disabled = false;
+  }
+}
+
 function markFormDirty() {
   formDirty = true;
 }
@@ -1173,9 +1257,32 @@ function bindEvents() {
   $("healthModal").addEventListener("click", (event) => {
     if (event.target === event.currentTarget) closeHealthModal();
   });
+  $("backupBtn").addEventListener("click", openBackupModal);
+  $("backupCloseBtn").addEventListener("click", () => {
+    $("backupModal").hidden = true;
+  });
+  $("backupRunBtn").addEventListener("click", runBackup);
+  $("backupModal").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) $("backupModal").hidden = true;
+  });
+  $("restoreBtn").addEventListener("click", () => $("backupFile").click());
+  $("backupFile").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    event.target.value = "";
+    if (file) openRestoreModal(file);
+  });
+  $("restoreCloseBtn").addEventListener("click", () => {
+    $("restoreModal").hidden = true;
+  });
+  $("restoreRunBtn").addEventListener("click", runRestore);
+  $("restoreModal").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) $("restoreModal").hidden = true;
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !$("healthModal").hidden) closeHealthModal();
     if (event.key === "Escape" && !$("moreMenu").hidden) closeMoreMenu();
+    if (event.key === "Escape" && !$("backupModal").hidden) $("backupModal").hidden = true;
+    if (event.key === "Escape" && !$("restoreModal").hidden) $("restoreModal").hidden = true;
   });
 
   for (const tab of document.querySelectorAll(".tab")) {
