@@ -121,6 +121,7 @@ def launch_camoufox(
     ext_dir: str | None = None,
 ) -> tuple[Any, Callable[[], None]]:
     try:
+        from camoufox.addons import DefaultAddons
         from camoufox.sync_api import Camoufox
     except Exception as exc:
         raise RuntimeError(
@@ -133,9 +134,13 @@ def launch_camoufox(
         "user_data_dir": str(data_root / profile["id"]),
         "os": "windows",
         "locale": profile["locale"],
-        "timezone": profile["timezone"],
+        # Camoufox's fingerprint engine reads timezone from its config dict,
+        # not as a top-level launch option.
+        "config": {"timezone": profile["timezone"]},
         "humanize": bool(profile.get("humanize")),
-        "exclude_addons": [],
+        # Skip bundled default addons (uBlock Origin): they require a network
+        # download at first launch and expose a detectable extension ID.
+        "exclude_addons": list(DefaultAddons),
     }
     proxy = profile.get("proxy")
     if proxy_server:
