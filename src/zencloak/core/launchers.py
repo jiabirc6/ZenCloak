@@ -148,14 +148,17 @@ def launch_camoufox(
         }
     cam = Camoufox(**options)
     try:
-        context = cam.start()
+        # Camoufox is a PlaywrightContextManager: __enter__ starts Playwright
+        # AND launches the browser/context; the base start() alone would only
+        # start Playwright. __exit__ closes the context and stops Playwright.
+        context = cam.__enter__()
     except Exception:
         try:
-            cam.stop()
+            cam.__exit__(None, None, None)
         except Exception:  # noqa: BLE001 - best effort cleanup
             pass
         raise
-    return context, lambda: (context.close(), cam.stop())
+    return context, lambda: cam.__exit__(None, None, None)
 
 
 ADAPTERS: dict[str, Callable[..., tuple[Any, Callable[[], None]]]] = {
