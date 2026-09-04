@@ -8,7 +8,7 @@
 | 级别 | 项 | 一句话 | 工作量 | 状态 |
 |---|---|---|---|---|
 | P0 | R1 翻译按钮 DOM 泄露 | 所有档案注入同一个 `#zencloakTranslateBtn`，一行 JS 即可识别 ZenCloak 并关联全部档案 | 小 | ✅ 已修（60cecd5） |
-| P1 | R2 内核可插拔 | CloakBrowser 闭源+商业条款风险，launcher 注入点已有，补第二后端 | 中 | ⏸ 用户待定 |
+| P1 | R2 内核可插拔 | CloakBrowser 闭源+商业条款风险，launcher 注入点已有，补第二后端 | 中 | ✅ 已完成（cloak 默认 + chromium 保底 + camoufox 实验，双 E2E 通过） |
 | P1 | R3 Playwright 漂移加固 | Translate hack 已有测试断言，补版本 pin | 极小 | ✅ 已修（741be57） |
 | P2 | R4 加密备份 | 登录态是全产品最贵资产，备份从"近期候选"提级 | 中 | ✅ 已完成（8038da4 + UI E2E 通过） |
 | P2 | R5 跨平台解锁 | 第一步放宽 Win10 已完成；macOS/Linux 需先验证内核可用性 | 小→大 | 第一步 ✅（5ece8ab） |
