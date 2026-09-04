@@ -104,6 +104,10 @@ class FakeContext:
         self.closed = False
         self.fail_on = None
         self.evaluate_error = None
+        self.init_scripts = []
+
+    def add_init_script(self, script):
+        self.init_scripts.append(script)
 
     def new_page(self):
         page = FakePage()
@@ -581,3 +585,23 @@ def test_launch_without_cdp_attach_has_no_debug_port(tmp_path):
     args = contexts[0][0]["args"]
     assert not any(arg.startswith("--remote-debugging-port=") for arg in args)
     assert manager.status("aaaaaaaaaaaa")["cdp_endpoint"] is None
+
+
+def test_launch_registers_voices_init_script_by_default(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["locale"] = "zh-HK"
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    ctx = contexts[0][1]
+    assert any("Microsoft Tracy" in s for s in ctx.init_scripts)
+
+
+def test_launch_skips_voices_init_script_when_disabled(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["spoof_voices"] = False
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    ctx = contexts[0][1]
+    assert ctx.init_scripts == []

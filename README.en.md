@@ -20,6 +20,7 @@ Download `ZenCloak-Setup-*.exe` and run it — no admin rights required. On firs
 - Built-in Mihomo proxy: subscription import / refresh / delete, airport node expansion, region filtering, concurrent latency tests (real proxy delay), egress IP detection
 - Manual HTTP / SOCKS5 proxy with username & password; passwords encrypted at rest via Windows DPAPI
 - Consistency pre-check: compares egress IP geolocation against the profile timezone / locale, warns on mismatch and fixes the timezone in one click
+- TTS voice spoofing: rewrites the speechSynthesis voice list to match the profile locale, fixing "voice pack country vs IP country" anomalies
 - Fingerprint health report: one-click deep check of webdriver traces, WebRTC leaks, Canvas noise, UA and applied settings
 - Human-like mouse, keyboard and scrolling behavior (`humanize`)
 - Isolated persistent profiles: cookies, login state and history per profile

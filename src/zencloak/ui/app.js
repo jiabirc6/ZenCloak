@@ -246,6 +246,7 @@ function renderForm() {
   $("humanPreset").value = profile.human_preset || "default";
   $("translateButton").checked = Boolean(profile.translate_button);
   $("cdpAttach").checked = Boolean(profile.cdp_attach);
+  $("spoofVoices").checked = profile.spoof_voices !== false;
   const proxy = profile.proxy;
   const builtinProxy = Boolean(profile.proxy_enabled) && profile.proxy_mode === "mihomo";
   $("proxyBuiltin").checked = builtinProxy;
@@ -759,6 +760,7 @@ function readForm() {
     human_preset: $("humanPreset").value,
     translate_button: $("translateButton").checked,
     cdp_attach: $("cdpAttach").checked,
+    spoof_voices: $("spoofVoices").checked,
     headless: false,
   };
 }

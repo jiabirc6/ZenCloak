@@ -12,6 +12,7 @@ from cloakbrowser import launch_persistent_context
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
 from .health import PROBE_JS
 from .proxy_runtime import allocate_ports
+from .voices import build_voices_init_script
 
 
 class SessionError(RuntimeError):
@@ -189,6 +190,10 @@ class SessionManager:
             context = self._launcher(
                 **self._build_launch_kwargs(profile, proxy_server, cdp_port)
             )
+            if profile.get("spoof_voices", True):
+                # The kernel does not patch speechSynthesis; rewrite the OS
+                # SAPI voice list to match the profile locale.
+                context.add_init_script(build_voices_init_script(profile.get("locale")))
             with self._lock:
                 session["context"] = context
                 session["status"] = "running"

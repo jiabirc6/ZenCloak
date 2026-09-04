@@ -396,6 +396,12 @@
                 <span>暴露 CDP 调试端口（供外部 Playwright / Selenium 脚本 attach，见 docs/attach.md；本机任意进程可完全控制该浏览器，慎用）</span>
               </label>
             </div>
+            <div class="field full toggle-field">
+              <label class="toggle">
+                <input id="spoofVoices" type="checkbox">
+                <span>语音包伪装（按档案语言重写 TTS 语音列表，修复「语音包国家 ↔ IP 国家」异常；若检测站报 toString 篡改可关闭）</span>
+              </label>
+            </div>
           </div>
         </form>
       </section>
