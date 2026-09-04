@@ -615,3 +615,62 @@ def test_disable_features_includes_native_occlusion(tmp_path):
     disable = next(arg for arg in args if arg.startswith("--disable-features="))
     assert "CalculateNativeWinOcclusion" in disable
     assert ",Translate" not in disable
+
+
+def test_kernel_chromium_routes_to_extra_adapter(tmp_path, monkeypatch):
+    import zencloak.core.sessions as sessions_mod
+
+    calls = []
+    closer_calls = []
+    fake_ctx = FakeContext()
+
+    def fake_launch(kernel, profile, data_root, proxy_server, cdp_port, ext_dir=None):
+        calls.append((kernel, ext_dir))
+        return fake_ctx, lambda: closer_calls.append(kernel)
+
+    monkeypatch.setattr(sessions_mod, "launch_extra_kernel", fake_launch)
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["kernel"] = "chromium"
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert calls == [("chromium", manager._extension_dir(profile))]
+    # cloak 的注入 launcher 不应被使用
+    assert contexts == []
+    manager.stop("aaaaaaaaaaaa")
+    _wait_status(manager, "aaaaaaaaaaaa", "stopped")
+    assert closer_calls == ["chromium"]
+
+
+def test_kernel_camoufox_skips_extension_dir(tmp_path, monkeypatch):
+    import zencloak.core.sessions as sessions_mod
+
+    calls = []
+    fake_ctx = FakeContext()
+
+    def fake_launch(kernel, profile, data_root, proxy_server, cdp_port, ext_dir=None):
+        calls.append((kernel, ext_dir))
+        return fake_ctx, lambda: None
+
+    monkeypatch.setattr(sessions_mod, "launch_extra_kernel", fake_launch)
+    manager, _ = _manager(tmp_path)
+    profile = _profile()
+    profile["kernel"] = "camoufox"
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert calls == [("camoufox", None)]
+
+
+def test_kernel_camoufox_missing_surfaces_install_hint(tmp_path, monkeypatch):
+    import zencloak.core.sessions as sessions_mod
+
+    def raise_missing(*_a, **_k):
+        raise RuntimeError('Camoufox 未安装：pip install "zencloak[camoufox]" 后执行 python -m camoufox fetch')
+
+    monkeypatch.setattr(sessions_mod, "launch_extra_kernel", raise_missing)
+    manager, _ = _manager(tmp_path)
+    profile = _profile()
+    profile["kernel"] = "camoufox"
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "error")
+    assert "Camoufox 未安装" in manager.status("aaaaaaaaaaaa")["error"]

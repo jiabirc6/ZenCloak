@@ -11,6 +11,7 @@ from cloakbrowser import launch_persistent_context
 
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
 from .health import PROBE_JS
+from .launchers import launch_extra_kernel
 from .proxy_runtime import allocate_ports
 from .voices import build_voices_init_script
 
@@ -99,6 +100,7 @@ class SessionManager:
                 "context": None,
                 "thread": None,
                 "cdp_port": None,
+                "closer": None,
             }
             self._sessions[profile_id] = session
         thread = threading.Thread(
@@ -192,15 +194,27 @@ class SessionManager:
             cdp_port = allocate_ports(1)[0] if profile.get("cdp_attach") else None
             with self._lock:
                 session["cdp_port"] = cdp_port
-            context = self._launcher(
-                **self._build_launch_kwargs(profile, proxy_server, cdp_port)
-            )
+            kernel = profile.get("kernel", "cloak")
+            closer = None
+            if kernel == "cloak":
+                context = self._launcher(
+                    **self._build_launch_kwargs(profile, proxy_server, cdp_port)
+                )
+            else:
+                # Camoufox is Firefox: MV3 Chromium extensions do not apply.
+                ext_dir = (
+                    self._extension_dir(profile) if kernel == "chromium" else None
+                )
+                context, closer = launch_extra_kernel(
+                    kernel, profile, self.data_root, proxy_server, cdp_port, ext_dir
+                )
             if profile.get("spoof_voices", True):
                 # The kernel does not patch speechSynthesis; rewrite the OS
                 # SAPI voice list to match the profile locale.
                 context.add_init_script(build_voices_init_script(profile.get("locale")))
             with self._lock:
                 session["context"] = context
+                session["closer"] = closer
                 session["status"] = "running"
                 session["error"] = None
             self._prepare_start_page(context, profile)
@@ -221,7 +235,7 @@ class SessionManager:
                         cdp = None
                 self._open_urls_from_queue(context, session)
                 time.sleep(0.3)
-            self._close_safely(context)
+            self._close_safely(context, session.get("closer"))
             with self._lock:
                 session["status"] = "stopped"
                 session["stopped_at"] = _now_iso()
@@ -354,13 +368,7 @@ class SessionManager:
         downloads_dir = self.data_root / profile["id"] / "Downloads"
         downloads_dir.mkdir(parents=True, exist_ok=True)
         kwargs["downloads_path"] = str(downloads_dir)
-        cleanup_stale_newtab_extensions(
-            profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
-        )
-        ext_dir = build_newtab_extension(
-            profile, self.data_root, dir_name=_NEWTAB_EXTENSION_DIR
-        )
-        kwargs["extension_paths"] = [str(ext_dir)]
+        kwargs["extension_paths"] = [self._extension_dir(profile)]
         proxy = profile.get("proxy")
         if proxy_server:
             kwargs["proxy"] = {"server": proxy_server}
@@ -503,8 +511,20 @@ class SessionManager:
         except Exception as exc:  # noqa: BLE001 - surfaced to run_page_op caller
             return exc
 
-    def _close_safely(self, context: Any) -> None:
+    def _extension_dir(self, profile: dict) -> str:
+        cleanup_stale_newtab_extensions(
+            profile, self.data_root, keep_dir=_NEWTAB_EXTENSION_DIR
+        )
+        ext_dir = build_newtab_extension(
+            profile, self.data_root, dir_name=_NEWTAB_EXTENSION_DIR
+        )
+        return str(ext_dir)
+
+    def _close_safely(self, context: Any, closer: Any = None) -> None:
         try:
-            context.close()
+            if closer is not None:
+                closer()
+            else:
+                context.close()
         except Exception:  # noqa: BLE001 - already closed by user or crash
             pass

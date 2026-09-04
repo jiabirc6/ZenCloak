@@ -15,6 +15,7 @@ from zencloak.core.backup import BackupError, create_backup, restore_backup
 from zencloak.core.consistency import ConsistencyError, check_consistency, lookup_ip_geo
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.health import build_report
+from zencloak.core.launchers import KERNELS, kernel_availability
 from zencloak.core.mihomo import MihomoError, ProxyManager
 from zencloak.core.models import normalize_start_url
 from zencloak.core.profiles import ProfileStore
@@ -312,6 +313,18 @@ def create_app(
     @app.get("/api/engine")
     def engine_status() -> dict:
         return _engine_info()
+
+    @app.get("/api/kernels")
+    def kernels() -> list[dict]:
+        availability = kernel_availability()
+        return [
+            {
+                **meta,
+                "available": availability.get(meta["id"], (False, "未知"))[0],
+                "reason": availability.get(meta["id"], (False, "未知"))[1],
+            }
+            for meta in KERNELS
+        ]
 
     @app.post("/api/proxy/subscriptions/import")
     def proxy_import_subscription(payload: dict[str, Any]) -> dict:

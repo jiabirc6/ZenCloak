@@ -732,3 +732,14 @@ def test_backup_export_skips_running_profile(client):
     data = resp.json()
     assert profile["id"] in data["skipped_running"]
     assert profile["id"] not in data["profiles"]
+
+
+def test_kernels_endpoint(client):
+    api_client, _, _ = client
+    resp = api_client.get("/api/kernels")
+    assert resp.status_code == 200
+    kernels = resp.json()
+    assert [k["id"] for k in kernels] == ["cloak", "camoufox", "chromium"]
+    by_id = {k["id"]: k for k in kernels}
+    assert by_id["cloak"]["available"] is True
+    assert by_id["chromium"]["available"] is True

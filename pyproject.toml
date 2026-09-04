@@ -26,6 +26,9 @@ dependencies = [
 zencloak = "zencloak.app:main"
 zencloak-mcp = "zencloak.mcp:main"
 
+[project.optional-dependencies]
+camoufox = ["camoufox[geoip]>=0.4"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/zencloak"]
 

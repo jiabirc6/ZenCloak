@@ -122,6 +122,14 @@
 
           <div class="view" data-view="fingerprint">
             <div class="field">
+              <label for="kernel">浏览器内核</label>
+              <select id="kernel">
+                <option value="cloak">CloakBrowser（默认 · Chromium stealth）</option>
+                <option value="camoufox">Camoufox（实验性 · Firefox stealth）</option>
+                <option value="chromium">标准 Chromium（无隐身 · 保底）</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="seed">指纹种子</label>
               <input id="seed" type="number" min="10000" max="99999" step="1">
             </div>

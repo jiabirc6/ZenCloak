@@ -127,6 +127,22 @@ async function loadEngine() {
   label.textContent = state.engine.available ? "引擎就绪" : "引擎检测中";
 }
 
+async function loadKernels() {
+  try {
+    const kernels = await api("/api/kernels");
+    for (const item of kernels) {
+      const option = $("kernel").querySelector(`option[value="${item.id}"]`);
+      if (!option) continue;
+      option.disabled = !item.available;
+      option.title = item.available
+        ? item.label
+        : `${item.label}：${item.reason || "不可用"}`;
+    }
+  } catch (error) {
+    // 内核列表拉取失败不阻塞表单，保持全部可选
+  }
+}
+
 async function loadProfiles() {
   state.profiles = await api("/api/profiles");
   const activeIds = new Set(state.profiles.map((p) => p.id));
@@ -235,6 +251,7 @@ function renderForm() {
   $("name").value = profile.name || "";
   $("startUrl").value = profile.start_url || "";
   $("notes").value = profile.notes || "";
+  $("kernel").value = profile.kernel || "cloak";
   $("seed").value = profile.seed;
   $("timezone").value = profile.timezone;
   $("locale").value = profile.locale;
@@ -733,6 +750,7 @@ function readForm() {
     name: $("name").value.trim() || "未命名档案",
     color: state.selectedColor,
     notes: $("notes").value,
+    kernel: $("kernel").value,
     seed: Number($("seed").value),
     timezone: $("timezone").value,
     locale: $("locale").value,
@@ -1311,7 +1329,7 @@ async function init() {
   if (window.lucide) window.lucide.createIcons();
   try {
     await getApiToken();
-    await Promise.all([loadEngine(), loadProfiles(), loadSessions(), loadSubscriptions()]);
+    await Promise.all([loadEngine(), loadKernels(), loadProfiles(), loadSessions(), loadSubscriptions()]);
     if (state.selectedId) renderForm();
   } catch (error) {
     toast(error.message, true);

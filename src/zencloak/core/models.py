@@ -54,6 +54,7 @@ class Profile(BaseModel):
     color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
     notes: str = ""
     seed: int = Field(ge=10000, le=99999)
+    kernel: Literal["cloak", "camoufox", "chromium"] = "cloak"
     timezone: str = Field(min_length=1)
     locale: str = Field(min_length=1)
     platform: Literal["windows"] = "windows"
