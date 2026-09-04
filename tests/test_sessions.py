@@ -605,3 +605,13 @@ def test_launch_skips_voices_init_script_when_disabled(tmp_path):
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     ctx = contexts[0][1]
     assert ctx.init_scripts == []
+
+
+def test_disable_features_includes_native_occlusion(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    args = contexts[0][0]["args"]
+    disable = next(arg for arg in args if arg.startswith("--disable-features="))
+    assert "CalculateNativeWinOcclusion" in disable
+    assert ",Translate" not in disable

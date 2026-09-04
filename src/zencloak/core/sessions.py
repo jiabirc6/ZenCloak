@@ -47,6 +47,11 @@ _PLAYWRIGHT_DEFAULT_DISABLE_FEATURES = (
 _DISABLE_FEATURES_WITHOUT_TRANSLATE = _PLAYWRIGHT_DEFAULT_DISABLE_FEATURES.replace(
     ",Translate", ""
 )
+# ZenCloak extras: native window-occlusion detection flips page visibility
+# to hidden when another window covers CloakBrowser, throttling rAF to
+# non-refresh-rate intervals (67ms etc.) that fingerprint checkers flag as
+# a synthetic compositor. Disabling it keeps frames ticking while covered.
+_DISABLE_FEATURES = _DISABLE_FEATURES_WITHOUT_TRANSLATE + ",CalculateNativeWinOcclusion"
 
 if (
     f"--disable-features={_PLAYWRIGHT_DEFAULT_DISABLE_FEATURES}"
@@ -330,7 +335,7 @@ class SessionManager:
             f"--lang={profile['locale']}",
             "--hide-crash-restore-bubble",
             f"--fingerprint-locale={profile['locale']}",
-            f"--disable-features={_DISABLE_FEATURES_WITHOUT_TRANSLATE}",
+            f"--disable-features={_DISABLE_FEATURES}",
             "--enable-features=Translate",
         ]
         if cdp_port:
