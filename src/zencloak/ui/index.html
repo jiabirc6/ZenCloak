@@ -128,26 +128,128 @@
             <div class="field">
               <label for="timezone">时区</label>
               <select id="timezone">
-                <option value="Asia/Shanghai">Asia/Shanghai</option>
-                <option value="Asia/Tokyo">Asia/Tokyo</option>
-                <option value="Asia/Singapore">Asia/Singapore</option>
-                <option value="Europe/London">Europe/London</option>
-                <option value="Europe/Berlin">Europe/Berlin</option>
-                <option value="America/New_York">America/New_York</option>
-                <option value="America/Los_Angeles">America/Los_Angeles</option>
-                <option value="Australia/Sydney">Australia/Sydney</option>
+                <optgroup label="亚洲">
+                  <option value="Asia/Shanghai">Asia/Shanghai（中国大陆）</option>
+                  <option value="Asia/Taipei">Asia/Taipei（中国台湾）</option>
+                  <option value="Asia/Hong_Kong">Asia/Hong_Kong（中国香港）</option>
+                  <option value="Asia/Singapore">Asia/Singapore（新加坡）</option>
+                  <option value="Asia/Kuala_Lumpur">Asia/Kuala_Lumpur（马来西亚）</option>
+                  <option value="Asia/Jakarta">Asia/Jakarta（印尼）</option>
+                  <option value="Asia/Manila">Asia/Manila（菲律宾）</option>
+                  <option value="Asia/Bangkok">Asia/Bangkok（泰国）</option>
+                  <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh（越南）</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo（日本）</option>
+                  <option value="Asia/Seoul">Asia/Seoul（韩国）</option>
+                  <option value="Asia/Kolkata">Asia/Kolkata（印度）</option>
+                  <option value="Asia/Dubai">Asia/Dubai（迪拜）</option>
+                  <option value="Asia/Riyadh">Asia/Riyadh（沙特）</option>
+                </optgroup>
+                <optgroup label="欧洲">
+                  <option value="Europe/London">Europe/London（英国）</option>
+                  <option value="Europe/Dublin">Europe/Dublin（爱尔兰）</option>
+                  <option value="Europe/Lisbon">Europe/Lisbon（葡萄牙）</option>
+                  <option value="Europe/Madrid">Europe/Madrid（西班牙）</option>
+                  <option value="Europe/Paris">Europe/Paris（法国）</option>
+                  <option value="Europe/Brussels">Europe/Brussels（比利时）</option>
+                  <option value="Europe/Amsterdam">Europe/Amsterdam（荷兰）</option>
+                  <option value="Europe/Berlin">Europe/Berlin（德国）</option>
+                  <option value="Europe/Zurich">Europe/Zurich（瑞士）</option>
+                  <option value="Europe/Rome">Europe/Rome（意大利）</option>
+                  <option value="Europe/Vienna">Europe/Vienna（奥地利）</option>
+                  <option value="Europe/Warsaw">Europe/Warsaw（波兰）</option>
+                  <option value="Europe/Prague">Europe/Prague（捷克）</option>
+                  <option value="Europe/Budapest">Europe/Budapest（匈牙利）</option>
+                  <option value="Europe/Stockholm">Europe/Stockholm（瑞典）</option>
+                  <option value="Europe/Oslo">Europe/Oslo（挪威）</option>
+                  <option value="Europe/Copenhagen">Europe/Copenhagen（丹麦）</option>
+                  <option value="Europe/Helsinki">Europe/Helsinki（芬兰）</option>
+                  <option value="Europe/Athens">Europe/Athens（希腊）</option>
+                  <option value="Europe/Kyiv">Europe/Kyiv（乌克兰）</option>
+                  <option value="Europe/Moscow">Europe/Moscow（俄罗斯）</option>
+                  <option value="Europe/Istanbul">Europe/Istanbul（土耳其）</option>
+                </optgroup>
+                <optgroup label="北美">
+                  <option value="America/New_York">America/New_York（美东）</option>
+                  <option value="America/Toronto">America/Toronto（多伦多）</option>
+                  <option value="America/Chicago">America/Chicago（美中）</option>
+                  <option value="America/Denver">America/Denver（山地）</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles（美西）</option>
+                  <option value="America/Vancouver">America/Vancouver（温哥华）</option>
+                  <option value="America/Mexico_City">America/Mexico_City（墨西哥城）</option>
+                </optgroup>
+                <optgroup label="南美">
+                  <option value="America/Bogota">America/Bogota（波哥大）</option>
+                  <option value="America/Lima">America/Lima（利马）</option>
+                  <option value="America/Santiago">America/Santiago（圣地亚哥）</option>
+                  <option value="America/Sao_Paulo">America/Sao_Paulo（圣保罗）</option>
+                  <option value="America/Buenos_Aires">America/Buenos_Aires（布宜诺斯艾利斯）</option>
+                </optgroup>
+                <optgroup label="大洋洲">
+                  <option value="Australia/Perth">Australia/Perth（珀斯）</option>
+                  <option value="Australia/Brisbane">Australia/Brisbane（布里斯班）</option>
+                  <option value="Australia/Sydney">Australia/Sydney（悉尼）</option>
+                  <option value="Australia/Melbourne">Australia/Melbourne（墨尔本）</option>
+                  <option value="Pacific/Auckland">Pacific/Auckland（奥克兰）</option>
+                </optgroup>
+                <optgroup label="非洲">
+                  <option value="Africa/Cairo">Africa/Cairo（开罗）</option>
+                  <option value="Africa/Lagos">Africa/Lagos（拉各斯）</option>
+                  <option value="Africa/Johannesburg">Africa/Johannesburg（约翰内斯堡）</option>
+                </optgroup>
               </select>
             </div>
             <div class="field">
               <label for="locale">语言</label>
               <select id="locale">
-                <option>zh-CN</option>
-                <option>en-US</option>
-                <option>ja-JP</option>
-                <option>ko-KR</option>
-                <option>de-DE</option>
-                <option>fr-FR</option>
-                <option>ru-RU</option>
+                <optgroup label="中文">
+                  <option value="zh-CN">zh-CN（简体·中国大陆）</option>
+                  <option value="zh-TW">zh-TW（繁体·台湾）</option>
+                  <option value="zh-HK">zh-HK（繁体·香港）</option>
+                  <option value="zh-SG">zh-SG（简体·新加坡）</option>
+                </optgroup>
+                <optgroup label="英语">
+                  <option value="en-US">en-US（美国）</option>
+                  <option value="en-GB">en-GB（英国）</option>
+                  <option value="en-CA">en-CA（加拿大）</option>
+                  <option value="en-AU">en-AU（澳大利亚）</option>
+                  <option value="en-NZ">en-NZ（新西兰）</option>
+                  <option value="en-IE">en-IE（爱尔兰）</option>
+                  <option value="en-IN">en-IN（印度）</option>
+                  <option value="en-SG">en-SG（新加坡）</option>
+                </optgroup>
+                <optgroup label="亚洲">
+                  <option value="ja-JP">ja-JP（日语）</option>
+                  <option value="ko-KR">ko-KR（韩语）</option>
+                  <option value="th-TH">th-TH（泰语）</option>
+                  <option value="vi-VN">vi-VN（越南语）</option>
+                  <option value="id-ID">id-ID（印尼语）</option>
+                  <option value="ms-MY">ms-MY（马来语）</option>
+                  <option value="fil-PH">fil-PH（菲律宾语）</option>
+                </optgroup>
+                <optgroup label="欧洲">
+                  <option value="de-DE">de-DE（德语）</option>
+                  <option value="fr-FR">fr-FR（法语）</option>
+                  <option value="es-ES">es-ES（西班牙语·西班牙）</option>
+                  <option value="es-MX">es-MX（西班牙语·墨西哥）</option>
+                  <option value="pt-BR">pt-BR（葡萄牙语·巴西）</option>
+                  <option value="pt-PT">pt-PT（葡萄牙语·葡萄牙）</option>
+                  <option value="it-IT">it-IT（意大利语）</option>
+                  <option value="nl-NL">nl-NL（荷兰语）</option>
+                  <option value="pl-PL">pl-PL（波兰语）</option>
+                  <option value="cs-CZ">cs-CZ（捷克语）</option>
+                  <option value="sv-SE">sv-SE（瑞典语）</option>
+                  <option value="da-DK">da-DK（丹麦语）</option>
+                  <option value="fi-FI">fi-FI（芬兰语）</option>
+                  <option value="el-GR">el-GR（希腊语）</option>
+                  <option value="ru-RU">ru-RU（俄语）</option>
+                  <option value="uk-UA">uk-UA（乌克兰语）</option>
+                  <option value="tr-TR">tr-TR（土耳其语）</option>
+                </optgroup>
+                <optgroup label="中东">
+                  <option value="ar-SA">ar-SA（阿拉伯语·沙特）</option>
+                  <option value="ar-EG">ar-EG（阿拉伯语·埃及）</option>
+                  <option value="he-IL">he-IL（希伯来语）</option>
+                </optgroup>
               </select>
             </div>
             <div class="field">
