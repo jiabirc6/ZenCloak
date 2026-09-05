@@ -57,7 +57,7 @@ winget install --id JRSoftware.InnoSetup -e
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\zencloak.iss
 ```
 
-输出：`installer/ZenCloak-Setup-0.3.0.exe`
+输出：`installer/ZenCloak-Setup-0.4.0.exe`
 
 编译 onedir 版：
 
@@ -65,7 +65,7 @@ winget install --id JRSoftware.InnoSetup -e
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\zencloak-dir.iss
 ```
 
-输出：`installer/ZenCloak-Setup-0.3.0-dir.exe`
+输出：`installer/ZenCloak-Setup-0.4.0-dir.exe`
 
 两个安装包都带一个默认不勾选的附加任务「安装后立即下载 CloakBrowser 内核」，勾选后安装完成时静默执行 `ZenCloak.exe --install-engine` 下载内核；不勾选则维持首次启动档案时自动下载。
 
@@ -77,17 +77,17 @@ python scripts\build_bundled.py
 
 脚本依次执行：PyInstaller onedir → 把本机 `~/.cloakbrowser/chromium-*` 拷入 `dist/ZenCloak/engine/` → 编译 `installer/zencloak-bundled.iss`。
 
-输出：`installer/ZenCloak-Setup-0.3.0-bundled.exe`（约 600 MB+）。应用启动时检测到 `engine/chromium-*` 目录会自动把 `CLOAKBROWSER_CACHE_DIR` 指过去，全程无需联网下载内核。
+输出：`installer/ZenCloak-Setup-0.4.0-bundled.exe`（约 600 MB+）。应用启动时检测到 `engine/chromium-*` 目录会自动把 `CLOAKBROWSER_CACHE_DIR` 指过去，全程无需联网下载内核。
 
 > ⚠️ 该产物**只能在自己 / 组织内部机器安装使用，禁止上传 GitHub Release 或任何公开分发渠道**——违反 CloakBrowser 二进制许可。
 
 ## 发布到 GitHub Releases
 
 ```powershell
-gh release create v0.3.0 installer/ZenCloak-Setup-0.3.0.exe `
-  --title "ZenCloak 0.3.0" `
-  --notes-file installer/release-notes-0.3.0.md
-gh release upload v0.3.0 installer/ZenCloak-Setup-0.3.0-dir.exe
+gh release create v0.4.0 installer/ZenCloak-Setup-0.4.0.exe `
+  --title "ZenCloak 0.4.0" `
+  --notes-file installer/release-notes-0.4.0.md
+gh release upload v0.4.0 installer/ZenCloak-Setup-0.4.0-dir.exe
 ```
 
 只上传公开版两个安装包；内置版不上传。
