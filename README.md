@@ -12,6 +12,24 @@ English documentation: [README.en.md](README.en.md)
 
 ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实 Chromium 窗口。
 
+## 📦 版本亮点
+
+**v0.4.0**
+- 浏览器内核可插拔：CloakBrowser（默认）之外，可选实验性 Firefox stealth 内核 Camoufox（`pip install "zencloak[camoufox]"`），以及无隐身的标准 Chromium 保底
+- 加密全量备份 / 恢复：档案 + 登录态打包为 AES-256 口令加密压缩包，运行中档案自动跳过
+- TTS 语音包伪装：按档案语言重写语音列表，消除「语音包国家 ↔ IP 国家」检测异常
+- CDP attach：外部 Playwright / Selenium 脚本可直接接入运行中的档案浏览器
+- 时区扩充至 56 个、语言 39 种（含 zh-TW / zh-HK 繁体），UI 全新设计
+
+**v0.3.0**
+- 内置 Mihomo 代理：订阅导入 / 刷新 / 删除、机场节点自动展开、并发真实延迟测速、出口 IP 检测
+- 指纹体检报告：一键深检 webdriver、WebRTC 泄漏、Canvas 噪声、UA 与配置生效
+- 出口 IP 一致性预检：时区 / 语言与 IP 归属地不符时警告并一键修正
+- MCP Server：AI 助手（ZCode / Claude Desktop / Cursor）直接操控指纹浏览器
+- 回收站、批量启停、档案导入导出复制
+
+完整变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 下载安装
 
 最新安装包：[ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
