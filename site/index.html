@@ -48,7 +48,7 @@
   <div class="hero-inner">
     <div class="hero-copy">
       <h1 class="reveal in">每个身份，<br>都有自己的浏览器。</h1>
-      <p class="hero-sub reveal d1 in">一个档案，一个真实且隔离的 Chromium 窗口。ZenCloak 为每个身份单独保存指纹、Cookie 和历史记录。</p>
+      <p class="hero-sub reveal d1 in">一个档案，一个真实且隔离的浏览器。ZenCloak 为每个身份单独保存指纹、Cookie 和历史记录，内核、代理与隐身细节全部就位。</p>
       <div class="hero-actions reveal d2 in">
         <a class="btn btn-primary" href="https://github.com/jiabirc6/ZenCloak/releases/latest">下载</a>
         <a class="btn btn-ghost" href="#how">了解工作原理</a>
@@ -61,7 +61,7 @@
   <div class="wrap stats">
     <div class="stat reveal in"><div class="num" data-count="1" data-suffix=" 次点击">1 次点击</div><div class="lbl">档案启动浏览器</div></div>
     <div class="stat reveal d1 in"><div class="num">零状态</div><div class="lbl">会话完全隔离</div></div>
-    <div class="stat reveal d2 in"><div class="num" data-count="100" data-suffix="%">100%</div><div class="lbl">真实 Chromium 隐身</div></div>
+    <div class="stat reveal d2 in"><div class="num" data-count="100" data-suffix="%">100%</div><div class="lbl">真实 stealth 内核</div></div>
   </div>
 </section>
 
@@ -100,13 +100,13 @@
       <div class="section-inner">
         <div class="sec-head">
           <h2 class="h-section reveal in">重新定义浏览器身份。</h2>
-          <p class="lead reveal d1 in">ZenCloak 只保留真实身份需要的东西：干净且持久的 Chromium 档案、稳定的指纹、按档案隔离的数据，互不串扰。</p>
+          <p class="lead reveal d1 in">ZenCloak 只保留真实身份需要的东西：干净且持久的浏览器档案、稳定的指纹、按档案隔离的数据，互不串扰。</p>
         </div>
         <div class="feat-grid">
           <div class="feat reveal in">
             <div class="metric">1 次点击</div>
             <h3>一键启动任意档案</h3>
-            <p>指纹种子只需创建一次。ZenCloak 一键启动真实的 stealth Chromium 窗口，身份已经就位。</p>
+            <p>指纹种子只需创建一次。ZenCloak 一键启动真实的 stealth 浏览器窗口，身份已经就位。</p>
           </div>
           <div class="feat reveal d1 in">
             <div class="metric">零状态</div>
@@ -114,14 +114,24 @@
             <p>Cookie、登录态和历史只存在于各自档案目录。档案之间不共享任何东西，会话之间不泄漏任何数据。</p>
           </div>
           <div class="feat reveal in">
-            <div class="metric">DPAPI</div>
-            <h3>代理密码加密</h3>
-            <p>每个档案可绑定 HTTP 或 SOCKS5 代理，密码先用 Windows DPAPI 加密再落盘。</p>
+            <div class="metric">Mihomo</div>
+            <h3>内置代理管理</h3>
+            <p>订阅导入 / 刷新、机场节点自动展开、按地区筛选、并发真实延迟测速与出口 IP 检测，全部内置。</p>
           </div>
           <div class="feat reveal d1 in">
-            <div class="metric">127.0.0.1</div>
-            <h3>本地 API</h3>
-            <p>本地 FastAPI 监听 127.0.0.1 随机端口，现在就能写脚本，MCP 自动化已在路线图上。</p>
+            <div class="metric">AES-256</div>
+            <h3>加密全量备份</h3>
+            <p>档案与登录态打包为口令加密的压缩包，缓存自动排除，运行中的档案安全跳过。</p>
+          </div>
+          <div class="feat reveal in">
+            <div class="metric">TTS</div>
+            <h3>语音包伪装</h3>
+            <p>语音列表随档案语言走，消除「语音包国家 ↔ IP 国家」检测异常；时区 / 语言一致性自动预检。</p>
+          </div>
+          <div class="feat reveal d1 in">
+            <div class="metric">API · MCP · CDP</div>
+            <h3>脚本与 AI 全接入</h3>
+            <p>本地 API 只监听 127.0.0.1 随机端口；MCP Server 供 AI 助手直接操控；CDP attach 供外部 Playwright / Selenium 脚本接入。</p>
           </div>
         </div>
       </div>
@@ -157,7 +167,7 @@
         </div>
         <div class="step">
           <span class="sidx">03</span>
-          <div><h3>自动化</h3><p>今天用本地 API 驱动，更丰富的自动化和 MCP Server 已在路线图上。</p></div>
+          <div><h3>自动化</h3><p>本地 API 驱动脚本，MCP Server 接入 AI 助手，CDP attach 供 Playwright / Selenium 直接操控。</p></div>
         </div>
       </div>
     </div>
