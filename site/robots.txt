@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://jiabirc6.github.io/ZenCloak/sitemap.xml
+Sitemap: https://zc.190003.xyz/sitemap.xml

@@ -1,6 +1,6 @@
 # ZenCloak
 
-[![主页](https://img.shields.io/badge/主页-GitHub%20Pages-black)](https://jiabirc6.github.io/ZenCloak/)
+[![主页](https://img.shields.io/badge/主页-GitHub%20Pages-black)](https://zc.190003.xyz/)
 
 English documentation: [README.md](README.md)
 
@@ -8,7 +8,7 @@ English documentation: [README.md](README.md)
 
 > 新手请先看：[ZenCloak 新手使用教程](docs/zencloak-tutorial.md)
 
-主页：<https://jiabirc6.github.io/ZenCloak/>（源码在 [`site/`](site/)）
+主页：<https://zc.190003.xyz/>（源码在 [`site/`](site/)）
 
 ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实浏览器窗口。
 

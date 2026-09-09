@@ -1,6 +1,6 @@
 # ZenCloak
 
-[![Homepage](https://img.shields.io/badge/Homepage-GitHub%20Pages-black)](https://jiabirc6.github.io/ZenCloak/)
+[![Homepage](https://img.shields.io/badge/Homepage-GitHub%20Pages-black)](https://zc.190003.xyz/)
 
 中文文档：[README.zh.md](README.zh.md)
 
