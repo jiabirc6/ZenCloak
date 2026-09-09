@@ -1,148 +1,145 @@
 # ZenCloak
 
-[![主页](https://img.shields.io/badge/主页-GitHub%20Pages-black)](https://jiabirc6.github.io/ZenCloak/)
+[![Homepage](https://img.shields.io/badge/Homepage-GitHub%20Pages-black)](https://jiabirc6.github.io/ZenCloak/)
 
-English documentation: [README.en.md](README.en.md)
+中文文档：[README.zh.md](README.zh.md)
 
-基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
+A personal anti-detect browser desktop client built on the [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium kernel.
 
-> 新手请先看：[ZenCloak 新手使用教程](docs/zencloak-tutorial.md)
+ZenCloak manages multiple browser identities through "profiles": every profile owns an isolated fingerprint seed, proxy, persistent session and human-like behavior settings, and launches a real browser window with one click.
 
-主页：<https://jiabirc6.github.io/ZenCloak/>（源码在 [`site/`](site/)）
-
-ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档案拥有独立的指纹种子、代理、持久化会话和类人行为设置，一键启动真实 Chromium 窗口。
-
-## 📦 版本亮点
+## 📦 Release highlights
 
 **v0.4.0**
-- 浏览器内核可插拔：CloakBrowser（默认）之外，可选实验性 Firefox stealth 内核 Camoufox（`pip install "zencloak[camoufox]"`），以及无隐身的标准 Chromium 保底
-- 加密全量备份 / 恢复：档案 + 登录态打包为 AES-256 口令加密压缩包，运行中档案自动跳过
-- TTS 语音包伪装：按档案语言重写语音列表，消除「语音包国家 ↔ IP 国家」检测异常
-- CDP attach：外部 Playwright / Selenium 脚本可直接接入运行中的档案浏览器
-- 时区扩充至 56 个、语言 39 种（含 zh-TW / zh-HK 繁体），UI 全新设计
+- Pluggable browser kernels: CloakBrowser (default), experimental Camoufox (Firefox stealth), and vanilla Chromium as a no-stealth fallback
+- Encrypted full backup / restore: profiles + login state in an AES-256 passphrase-protected archive; running profiles are safely skipped
+- TTS voice-pack spoofing: voice lists follow the profile language, eliminating “voice-pack country vs IP country” flags
+- CDP attach: external Playwright / Selenium scripts can attach to a running profile browser
+- Timezones expanded to 56 and locales to 39 (incl. zh-TW / zh-HK traditional), fully redesigned UI
 
 **v0.3.0**
-- 内置 Mihomo 代理：订阅导入 / 刷新 / 删除、机场节点自动展开、并发真实延迟测速、出口 IP 检测
-- 指纹体检报告：一键深检 webdriver、WebRTC 泄漏、Canvas 噪声、UA 与配置生效
-- 出口 IP 一致性预检：时区 / 语言与 IP 归属地不符时警告并一键修正
-- MCP Server：AI 助手（ZCode / Claude Desktop / Cursor）直接操控指纹浏览器
-- 回收站、批量启停、档案导入导出复制
+- Built-in Mihomo proxy: subscription import / refresh / delete, airport node expansion, concurrent real-latency tests, egress IP detection
+- Fingerprint health report: one-click deep check of webdriver, WebRTC leaks, Canvas noise, UA and applied settings
+- Egress IP consistency pre-check with one-click timezone fix
+- MCP server: AI assistants (ZCode / Claude Desktop / Cursor) drive the browser directly
+- Recycle bin, batch start/stop, profile import / export / duplicate
 
-完整变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+Full changelog: [CHANGELOG.md](CHANGELOG.md).
 
-## 下载安装
+## Download
 
-最新安装包：[ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
+Latest installer: [ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
 
-下载 `ZenCloak-Setup-*.exe` 后双击安装即可，无需管理员权限。首次启动浏览器档案时，若本机没有 CloakBrowser 内核，ZenCloak 会自动下载约 200MB 的 stealth Chromium 二进制并缓存在 `~/.cloakbrowser/`。
+Download `ZenCloak-Setup-*.exe` and run it — no admin rights required. On first browser launch, if the CloakBrowser kernel is missing, ZenCloak downloads the ~200 MB stealth Chromium binary automatically and caches it under `~/.cloakbrowser/`.
 
-## 特性
+## Features
 
-- 多指纹档案：指纹种子、时区、语言、屏幕、CPU 核数、设备内存、User-Agent
-- 内置 Mihomo 代理：订阅导入 / 刷新 / 删除、机场节点自动展开、按地区筛选、并发测速（真实代理延迟）、出口 IP 检测
-- HTTP / SOCKS5 手动代理，支持用户名密码；密码使用 Windows DPAPI 加密落盘
-- 一致性预检：启动后自动比对出口 IP 归属地与档案时区 / 语言，不一致时警告并支持一键修正
-- TTS 语音包伪装：按档案语言重写 speechSynthesis 语音列表，修复「语音包国家 ↔ IP 国家」异常
-- 指纹体检报告：一键深检 webdriver 痕迹、WebRTC 泄漏、Canvas 噪声、UA、配置生效情况
-- 类人鼠标、键盘、滚动行为（`humanize`）
-- 独立持久化 profile：cookie、登录态、历史数据按档案隔离
-- 一键启动 / 停止浏览器窗口，支持批量启停、回收站、档案导入导出复制
-- 加密全量备份：全部档案 + 登录态打包为口令保护的 AES-256 压缩包
-- 内置 BrowserScan、FingerprintJS、BrowserLeaks、Incolumitas 检测站点入口
-- MCP Server：ZCode / Claude Desktop / Cursor 等 AI 助手直接操控指纹浏览器（见 [docs/mcp.md](docs/mcp.md)）
-- CDP attach 模式：外部 Playwright / Selenium 脚本可直接接入运行中的档案（见 [docs/attach.md](docs/attach.md)）
-- 本地 API 只监听 `127.0.0.1` 随机端口，Bearer 令牌鉴权
-- 首次启动自动创建「本地档案」，默认匹配本机 Windows / Asia/Shanghai / zh-CN
+- Multiple fingerprint profiles: seed, timezone, locale, screen, CPU cores, device memory, User-Agent
+- Pluggable browser kernels: CloakBrowser (default), experimental Camoufox (Firefox stealth), vanilla Chromium as a no-stealth fallback
+- Built-in Mihomo proxy: subscription import / refresh / delete, airport node expansion, region filtering, concurrent latency tests (real proxy delay), egress IP detection
+- Manual HTTP / SOCKS5 proxy with username & password; passwords encrypted at rest via Windows DPAPI
+- Consistency pre-check: compares egress IP geolocation against the profile timezone / locale, warns on mismatch and fixes the timezone in one click
+- TTS voice spoofing: rewrites the speechSynthesis voice list to match the profile locale, fixing "voice pack country vs IP country" anomalies
+- Fingerprint health report: one-click deep check of webdriver traces, WebRTC leaks, Canvas noise, UA and applied settings
+- Human-like mouse, keyboard and scrolling behavior (`humanize`)
+- Isolated persistent profiles: cookies, login state and history per profile
+- One-click launch / stop, batch start/stop, recycle bin, profile import / export / duplicate
+- Encrypted full backup: all profiles + login state into an AES-256 passphrase-protected archive
+- Built-in entries to BrowserScan, FingerprintJS, BrowserLeaks and Incolumitas
+- MCP server: let AI assistants (ZCode / Claude Desktop / Cursor) drive the browser directly (see [docs/mcp.md](docs/mcp.md))
+- CDP attach mode: external Playwright / Selenium scripts can attach to a running profile (see [docs/attach.md](docs/attach.md))
+- Local API bound to `127.0.0.1` on a random port, Bearer-token protected
+- First run auto-creates a "Local" profile matching your machine (Windows / Asia/Shanghai / zh-CN)
 
-## 环境要求
+## Requirements
 
-- Windows 10 / 11（x64）
-- Python 3.12（仅开发模式需要）
-- Node.js 不需要，但本机需要可用的 CloakBrowser binary
+- Windows 10 / 11 (x64)
+- Python 3.12 (development mode only)
+- No Node.js needed; a working CloakBrowser binary is fetched automatically
 
-## 安装
+## Install (development)
 
 ```powershell
 python -m pip install -e .
-python -m cloakbrowser install   # 下载 stealth Chromium 二进制
+python -m cloakbrowser install   # download the stealth Chromium binary
 ```
 
-## 启动
+## Run
 
-已打包用户直接双击 `dist\ZenCloak.exe`，单文件、无控制台窗口。
+Packaged users: just double-click `dist\ZenCloak.exe` (single file, no console window).
 
-开发模式可以在 PowerShell 中启动：
+Development mode:
 
 ```powershell
 python -m zencloak
 ```
 
-> 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。单文件 EXE 首次启动需要解压依赖，通常会等待 20 秒左右。
+> Keep the terminal open while `python -m zencloak` runs. The single-file EXE unpacks dependencies on start and takes ~20 s; see [docs/packaging.md](docs/packaging.md) to build a fast-start onedir version (~1-2 s).
 
-如果觉得单文件 EXE 启动慢，可以按 [docs/packaging.md](docs/packaging.md) 构建 onedir 快速启动版（约 1-2 秒启动）。
+## Usage
 
-## 使用
+1. After first launch, a "Local" profile appears in the sidebar.
+2. Click "新建档案" (New profile) to create an identity; configure fingerprint, proxy and behavior as needed.
+3. "保存" (Save) writes the profile to `~/.zencloak/profiles/`.
+4. "启动" (Launch) opens the profile's CloakBrowser window; browser data lives in `~/.zencloak/data/<profile-id>/`.
+5. While running, use the detection-site buttons to open fingerprint check pages inside the stealth browser.
 
-1. 首次启动后，左侧默认出现「本地档案」。
-2. 点击「新建档案」创建新身份，按需配置指纹、代理和行为参数。
-3. 点击「保存」写入 `~/.zencloak/profiles/`。
-4. 点击「启动」打开该档案对应的 CloakBrowser 窗口，浏览器数据写入 `~/.zencloak/data/<档案ID>/`。
-5. 档案运行中可点击检测站点按钮，直接在指纹浏览器里打开对应检测页面。
-
-## 数据目录
+## Data directory
 
 ```
 ~/.zencloak/
-├── profiles/          # 指纹档案 JSON
-└── data/              # 每个档案的持久化浏览器数据
+├── profiles/          # fingerprint profile JSON files
+├── data/              # persistent browser data per profile
+└── backups/           # encrypted backup archives
 ```
 
-## 项目结构
+## Project structure
 
 ```
 src/zencloak/
-├── app.py             # 桌面入口：uvicorn + pywebview
-├── api.py             # 本地 FastAPI 接口
-├── mcp.py             # MCP Server：AI 助手操控指纹浏览器
+├── app.py             # desktop entry: uvicorn + pywebview
+├── api.py             # local FastAPI
+├── mcp.py             # MCP server for AI assistants
 ├── core/
-│   ├── fingerprint.py # 指纹参数与默认档案
-│   ├── models.py      # 档案数据模型与校验
-│   ├── profiles.py    # 档案 JSON 存储
-│   ├── sessions.py    # CloakBrowser 会话管理
-│   ├── mihomo.py      # 内置 Mihomo 代理与真实延迟测速
-│   ├── subscriptions.py # 订阅导入 / 机场节点展开 / 刷新
-│   ├── consistency.py # 出口 IP 与指纹一致性预检
-│   ├── health.py      # 指纹体检探测脚本与报告
-│   └── secrets.py     # DPAPI 加密存储
-└── ui/                # 桌面 UI（HTML / CSS / JS）
+│   ├── fingerprint.py # fingerprint parameters & default profile
+│   ├── models.py      # profile schema & validation
+│   ├── profiles.py    # profile JSON storage
+│   ├── sessions.py    # CloakBrowser session management
+│   ├── mihomo.py      # built-in Mihomo proxy & real latency tests
+│   ├── subscriptions.py # subscription import / node expansion / refresh
+│   ├── consistency.py # egress IP vs fingerprint pre-check
+│   ├── health.py      # fingerprint health probes & report
+│   ├── backup.py      # encrypted backup / restore
+│   └── secrets.py     # DPAPI encryption
+└── ui/                # desktop UI (HTML / CSS / JS)
 ```
 
-## AI 助手集成（MCP）
+## AI assistant integration (MCP)
 
-ZenCloak 内置 MCP Server，让 ZCode / Claude Desktop / Cursor 等 AI 助手直接操控指纹浏览器：启动停止档案、打开网址、读取页面、截图、跑指纹体检。配置方法与工具列表见 [docs/mcp.md](docs/mcp.md)。
+ZenCloak ships an MCP server so ZCode / Claude Desktop / Cursor can launch profiles, open URLs, read pages, take screenshots and run health checks. Setup and tool list: [docs/mcp.md](docs/mcp.md).
 
-## 测试
+## Tests
 
 ```powershell
 python -m pytest
 ```
 
-包含真实 CloakBrowser 冒烟测试，会验证 `navigator.webdriver=false`、UA 无 Headless 痕迹、插件列表正常。
+Includes real CloakBrowser smoke tests verifying `navigator.webdriver=false`, a clean User-Agent and a sane plugin list.
 
-## 常见问题
+## FAQ
 
-**为什么直接打开 `src/zencloak/ui/index.html` 是坏的？**
+**Why does opening `src/zencloak/ui/index.html` directly show "not connected"?**
 
-UI 需要本地 API 才能读取档案。请始终通过 `dist\ZenCloak.exe` 或 `python -m zencloak` 启动；直接打开 HTML 会显示未连接提示。
+The UI needs the local API. Always start via `dist\ZenCloak.exe` or `python -m zencloak`.
 
-**启动时出现 `Update available: cloakbrowser ...` 是什么？**
+**What is the `Update available: cloakbrowser ...` message?**
 
-这是 CloakBrowser 的升级提示，不影响运行。当前 v146 内核免费且无需登录；升级最新内核可能需要 CloakBrowser 账号或授权，按需决定即可。
+It is CloakBrowser's upgrade notice and does not affect operation. The current v146 kernel is free and login-less; newer kernels may require a CloakBrowser account.
 
-**代理密码存在哪里？**
+**Where are proxy passwords stored?**
 
-已使用 Windows DPAPI 加密后保存在档案 JSON 中，仅本机当前用户可解密。请勿把 `~/.zencloak/` 或项目内档案文件提交到公开仓库。
+Encrypted with Windows DPAPI inside the profile JSON — decryptable only by the current user on this machine. Never commit `~/.zencloak/` or exported profiles to a public repository. After restoring a backup on a different machine, re-enter proxy passwords once per profile.
 
-## 许可
+## License
 
-本项目包装与客户端代码采用 MIT 许可，见 [LICENSE](LICENSE)。CloakBrowser 二进制使用其自身许可，详情见 [CloakBrowser BINARY-LICENSE](https://github.com/CloakHQ/CloakBrowser/blob/main/BINARY-LICENSE.md)。请仅将本工具用于合法、已获授权的场景。
+This wrapper and client code are MIT licensed, see [LICENSE](LICENSE). The CloakBrowser binary is subject to its own license, see [CloakBrowser BINARY-LICENSE](https://github.com/CloakHQ/CloakBrowser/blob/main/BINARY-LICENSE.md). Use this tool only for lawful, authorized purposes.

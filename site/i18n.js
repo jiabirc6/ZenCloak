@@ -7,6 +7,14 @@
   "use strict";
 
   var STORAGE = "zencloak_site_lang";
+  var TITLES = {
+    zh: "ZenCloak · 每个身份都有自己的浏览器",
+    en: "ZenCloak · Every identity deserves its own browser"
+  };
+  var DESCRIPTIONS = {
+    zh: "ZenCloak 是基于 CloakBrowser stealth Chromium 的开源指纹浏览器。一个档案，一个隔离的浏览器身份。",
+    en: "An open-source anti-detect browser built on the CloakBrowser stealth kernel. One profile, one isolated browser identity."
+  };
 
   var EN = {
     "nav-how": "How it works",
@@ -109,6 +117,9 @@
       s.el.setAttribute("data-suffix", en ? (EN[key] || s.value) : s.value);
     });
     document.documentElement.lang = en ? "en" : "zh-CN";
+    document.title = en ? TITLES.en : TITLES.zh;
+    var meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", en ? DESCRIPTIONS.en : DESCRIPTIONS.zh);
     document.querySelectorAll(".lang-btn").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-lang") === lang);
     });
@@ -117,13 +128,16 @@
   }
 
   capture();
-  var want = "zh";
+  var want = "en";  // 站点默认英文；?lang= 参数优先，其次 localStorage
   var params = new URLSearchParams(location.search);
-  if (params.get("lang")) want = params.get("lang");
-  try {
-    var saved = localStorage.getItem(STORAGE);
-    if (saved) want = saved;
-  } catch (e) {}
+  if (params.get("lang")) {
+    want = params.get("lang");
+  } else {
+    try {
+      var saved = localStorage.getItem(STORAGE);
+      if (saved) want = saved;
+    } catch (e) {}
+  }
   apply(want === "en" ? "en" : "zh");
 
   document.addEventListener("click", function (e) {
