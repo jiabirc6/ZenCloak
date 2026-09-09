@@ -4,7 +4,7 @@
 
 English documentation: [README.md](README.md)
 
-基于 [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
+基于 stealth Chromium 内核构建的个人指纹浏览器桌面客户端。
 
 > 新手请先看：[ZenCloak 新手使用教程](docs/zencloak-tutorial.md)
 

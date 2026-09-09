@@ -12,8 +12,8 @@
     en: "ZenCloak · Every identity deserves its own browser"
   };
   var DESCRIPTIONS = {
-    zh: "ZenCloak 是基于 CloakBrowser stealth Chromium 的开源指纹浏览器。一个档案，一个隔离的浏览器身份。",
-    en: "An open-source anti-detect browser built on the CloakBrowser stealth kernel. One profile, one isolated browser identity."
+    zh: "ZenCloak 是一款基于 stealth Chromium 内核的开源指纹浏览器。一个档案，一个隔离的浏览器身份。",
+    en: "An open-source anti-detect browser for Windows powered by a stealth Chromium kernel. One profile, one isolated browser identity."
   };
 
   var EN = {

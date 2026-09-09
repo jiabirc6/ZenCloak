@@ -4,7 +4,7 @@
 
 中文文档：[README.zh.md](README.zh.md)
 
-A personal anti-detect browser desktop client built on the [CloakBrowser](https://github.com/CloakHQ/CloakBrowser) stealth Chromium kernel.
+A personal anti-detect browser desktop client powered by a stealth Chromium kernel.
 
 ZenCloak manages multiple browser identities through "profiles": every profile owns an isolated fingerprint seed, proxy, persistent session and human-like behavior settings, and launches a real browser window with one click.
 
