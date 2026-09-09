@@ -86,7 +86,7 @@
 
   var snippets = {
     py: [
-      M("# 通过本地 API 启动 ZenCloak 档案"),
+      M("__PY_COMMENT__"),
       K("import") + " requests",
       "",
       "API " + P("=") + " " + S('"http://127.0.0.1:PORT"'),
@@ -99,7 +99,7 @@
       "    json" + P("=") + " {" + S('"url"') + P(":") + " " + S('"https://example.com"') + "})"
     ],
     js: [
-      M("// 用 Node.js 启动 ZenCloak 档案"),
+      M("__JS_COMMENT__"),
       K("const") + " API " + P("=") + " " + S('"http://127.0.0.1:PORT"') + ";",
       K("const") + " res " + P("=") + " " + K("await") + " fetch(API " + P("+") + " " + S('"/api/profiles"') + ", {",
       "  method" + P(":") + " " + S('"POST"') + ",",
@@ -110,7 +110,7 @@
       K("await") + " fetch(API " + P("+") + " " + S('"/api/sessions/"') + " " + P("+") + " profile.id " + P("+") + " " + S('"/launch"') + ", { method" + P(":") + " " + S('"POST"') + " });"
     ],
     pwsh: [
-      M("# 用 PowerShell 启动档案"),
+      M("__PWSH_COMMENT__"),
       "$API " + P("=") + " " + S('"http://127.0.0.1:PORT"'),
       "$body " + P("=") + " " + S('"{\\"name\\":\\"shop-01\\"}"'),
       "$profile " + P("=") + " Invoke-RestMethod -Method Post -Uri ($API " + P("+") + " " + S('"/api/profiles"') + ") -ContentType " + S('"application/json"') + " -Body $body",
@@ -128,10 +128,17 @@
     ]
   };
   var curLang = "py";
+  var uiLang = "zh";
+  var SNIPPET_COMMENTS = {
+    py: { zh: "# 通过本地 API 启动 ZenCloak 档案", en: "# Launch a ZenCloak profile via the local API" },
+    js: { zh: "// 用 Node.js 启动 ZenCloak 档案", en: "// Launch a ZenCloak profile from Node.js" },
+    pwsh: { zh: "# 用 PowerShell 启动档案", en: "# Launch a profile with PowerShell" }
+  };
 
   function renderCode() {
     if (!codeBody) return;
-    var rows = snippets[curLang] || [];
+    var rows = (snippets[curLang] || []).slice();
+    if (SNIPPET_COMMENTS[curLang]) rows[0] = SNIPPET_COMMENTS[curLang][uiLang] || rows[0];
     var html = "<pre>";
     rows.forEach(function (r) {
       html += '<span class="code-line">' + (r && r.length ? r : " ") + "</span>";
@@ -148,6 +155,12 @@
       curLang = tab.getAttribute("data-lang");
       renderCode();
     });
+  });
+
+  /* ---------- language switch re-renders snippet comments ---------- */
+  window.addEventListener("langchange", function (e) {
+    uiLang = e.detail === "en" ? "en" : "zh";
+    renderCode();
   });
 
   /* ---------- nudge hero video to play (mobile autoplay can stall) ---------- */
