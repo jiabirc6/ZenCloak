@@ -264,6 +264,7 @@ function renderForm() {
   $("translateButton").checked = Boolean(profile.translate_button);
   $("cdpAttach").checked = Boolean(profile.cdp_attach);
   $("spoofVoices").checked = profile.spoof_voices !== false;
+  $("downloadDir").value = profile.download_dir || "";
   const proxy = profile.proxy;
   const builtinProxy = Boolean(profile.proxy_enabled) && profile.proxy_mode === "mihomo";
   $("proxyBuiltin").checked = builtinProxy;
@@ -779,6 +780,7 @@ function readForm() {
     translate_button: $("translateButton").checked,
     cdp_attach: $("cdpAttach").checked,
     spoof_voices: $("spoofVoices").checked,
+    download_dir: $("downloadDir").value.trim() || null,
     headless: false,
   };
 }
@@ -1321,6 +1323,49 @@ function bindEvents() {
 
   for (const button of document.querySelectorAll(".detect-btn")) {
     button.addEventListener("click", () => openDetectUrl(button.dataset.url));
+  }
+
+  $("pickDownloadDir").addEventListener("click", pickDownloadDir);
+  $("openDownloadDir").addEventListener("click", openDownloadDir);
+  $("clearDownloadDir").addEventListener("click", () => {
+    $("downloadDir").value = "";
+    toast("已恢复为默认下载目录，保存后生效");
+  });
+}
+
+async function pickDownloadDir() {
+  if (!state.selectedId) return;
+  try {
+    const result = await api(
+      `/api/profiles/${state.selectedId}/pick-download-dir`,
+      { method: "POST" }
+    );
+    if (result.cancelled) return;
+    $("downloadDir").value = result.path || "";
+    toast("已选择目录，点击「保存」生效");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function openDownloadDir() {
+  if (!state.selectedId) return;
+  const typed = $("downloadDir").value.trim();
+  try {
+    if (typed) {
+      await api(`/api/profiles/${state.selectedId}/open-download-dir`, {
+        method: "POST",
+        body: JSON.stringify({ path: typed }),
+      });
+      return;
+    }
+    // Nothing chosen yet: fall back to the profile's built-in folder, which
+    // is what the browser would use anyway.
+    await api(`/api/profiles/${state.selectedId}/open-downloads`, {
+      method: "POST",
+    });
+  } catch (error) {
+    toast(error.message, true);
   }
 }
 

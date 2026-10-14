@@ -346,6 +346,21 @@ class SessionManager:
         """
         return self._resolve_profile_path(profile["id"])
 
+    def _downloads_dir(self, profile: dict) -> Path:
+        """Where this profile's downloads go.
+
+        A user-chosen folder wins; otherwise it falls back to the per-profile
+        directory under the data root. The custom path is intentionally not
+        confined to the data root - the whole point is to let people put
+        downloads somewhere they can actually find, such as ``D:\\Downloads``.
+        """
+        custom = profile.get("download_dir")
+        if custom:
+            candidate = Path(custom)
+            if candidate.is_absolute():
+                return candidate
+        return self._resolve_profile_path(profile["id"], "Downloads")
+
     def _resolve_profile_path(self, profile_id: str, *parts: str) -> Path:
         root = self.data_root.resolve()
         candidate = (root / profile_id).joinpath(*parts).resolve()
@@ -382,7 +397,7 @@ class SessionManager:
             "human_preset": profile["human_preset"],
             "accept_downloads": True,
         }
-        downloads_dir = self._resolve_profile_path(profile["id"], "Downloads")
+        downloads_dir = self._downloads_dir(profile)
         downloads_dir.mkdir(parents=True, exist_ok=True)
         kwargs["downloads_path"] = str(downloads_dir)
         kwargs["extension_paths"] = [self._extension_dir(profile)]

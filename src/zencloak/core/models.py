@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -75,6 +76,10 @@ class Profile(BaseModel):
     translate_button: bool = False
     cdp_attach: bool = False
     spoof_voices: bool = True
+    # Where downloaded files land. Empty means the per-profile default under
+    # the data root, which is easy to lose track of; the UI lets the user pick
+    # any folder on the machine instead.
+    download_dir: str | None = None
     start_url: str | None = None
     headless: bool = False
     created_at: str
@@ -105,6 +110,27 @@ class Profile(BaseModel):
     @classmethod
     def normalize_start_url(cls, value: str | None) -> str | None:
         return normalize_start_url(value)
+
+    @field_validator("download_dir")
+    @classmethod
+    def normalize_download_dir(cls, value: str | None) -> str | None:
+        """Blank means "use the per-profile default".
+
+        The path is deliberately not required to exist yet: a user may pick a
+        folder before creating it, and the session creates it at launch. It
+        only has to be an absolute path that does not contain a null byte.
+        """
+        if value is None:
+            return None
+        text = value.strip().strip('"')
+        if not text:
+            return None
+        if "\x00" in text:
+            raise ValueError("下载目录包含非法字符")
+        candidate = Path(text)
+        if not candidate.is_absolute():
+            raise ValueError("下载目录必须是绝对路径")
+        return str(candidate)
 
     @model_validator(mode="after")
     def screen_pair_supported(self) -> "Profile":

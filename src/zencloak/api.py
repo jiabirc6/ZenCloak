@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from zencloak.core.backup import BackupError, create_backup, restore_backup
 from zencloak.core.consistency import ConsistencyError, check_consistency, lookup_ip_geo
+from zencloak.core.downloads_dir import ask_directory, download_dir_for
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.health import build_report
 from zencloak.core.launchers import KERNELS, kernel_availability
@@ -119,17 +120,52 @@ def create_app(
 
     @app.post("/api/profiles/{profile_id}/open-downloads")
     def open_profile_downloads(profile_id: str) -> dict:
-        profile_or_404(profile_id)
-        try:
-            downloads_dir = store.profile_data_subdir(profile_id, "Downloads")
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        profile = profile_or_404(profile_id)
+        # Must match where the browser actually saves: the profile's custom
+        # folder when set, otherwise the per-profile default.
+        downloads_dir = download_dir_for(store, profile)
         downloads_dir.mkdir(parents=True, exist_ok=True)
         try:
             os.startfile(str(downloads_dir))
         except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {"opened": True, "path": str(downloads_dir)}
+
+    @app.post("/api/profiles/{profile_id}/pick-download-dir")
+    def pick_profile_download_dir(profile_id: str) -> dict:
+        """Open the native folder picker and return the chosen path.
+
+        The dialog runs on a worker thread because tkinter needs its own main
+        loop; blocking the request thread would freeze the UI until the user
+        answers. Returns ``cancelled`` when the dialog is dismissed.
+        """
+        profile = profile_or_404(profile_id)
+        try:
+            chosen = ask_directory(initial=download_dir_for(store, profile))
+        except Exception as exc:  # noqa: BLE001 - surface picker problems to the UI
+            raise HTTPException(
+                status_code=500, detail=f"无法打开目录选择框: {exc}"
+            ) from exc
+        if not chosen:
+            return {"cancelled": True, "path": None}
+        return {"cancelled": False, "path": chosen}
+
+    @app.post("/api/profiles/{profile_id}/open-download-dir")
+    def open_profile_download_dir(profile_id: str, payload: dict) -> dict:
+        """Open a folder in Explorer to confirm a chosen download path."""
+        profile_or_404(profile_id)
+        raw = str((payload or {}).get("path") or "").strip()
+        if not raw:
+            raise HTTPException(status_code=400, detail="路径不能为空")
+        target = Path(raw)
+        if not target.is_absolute():
+            raise HTTPException(status_code=400, detail="必须是绝对路径")
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(target))
+        except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {"opened": True, "path": str(target)}
 
     @app.put("/api/profiles/{profile_id}")
     def update_profile(profile_id: str, payload: dict[str, Any]) -> dict:
