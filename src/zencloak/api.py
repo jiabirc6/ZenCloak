@@ -1,6 +1,5 @@
 import os
 import tempfile
-import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -20,6 +19,7 @@ from zencloak.core.mihomo import MihomoError, ProxyManager
 from zencloak.core.models import normalize_start_url
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionError, SessionManager
+from zencloak.core.shutdown import spawn_hard_exit
 from zencloak.core.subscriptions import (
     delete_subscription,
     get_subscription,
@@ -558,11 +558,13 @@ def create_app(
 
     @app.post("/api/shutdown")
     def shutdown() -> dict:
-        def _exit_later() -> None:
-            time.sleep(0.2)
-            os._exit(0)
+        """Stop everything, then exit.
 
-        threading.Thread(target=_exit_later, daemon=True).start()
+        Cleanup runs before ``os._exit`` (which skips finally blocks and
+        atexit handlers); without it the mihomo children and browser sessions
+        leak. Shared with the tray Exit path via ``core.shutdown``.
+        """
+        spawn_hard_exit(sessions=sessions, proxy_manager=proxy_manager)
         return {"ok": True}
 
     if (UI_DIR / "index.html").exists():

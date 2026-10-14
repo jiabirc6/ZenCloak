@@ -18,6 +18,7 @@ from zencloak.core.lock import InstanceLock
 from zencloak.core.mihomo import ProxyManager
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionManager
+from zencloak.core.shutdown import stop_everything
 
 
 def _free_port() -> int:
@@ -100,26 +101,10 @@ def _build_tray(window, sessions, server, proxy_manager=None):
         return None
 
     def _quit() -> None:
-        def _force_exit() -> None:
-            time.sleep(0.5)
-            os._exit(0)
-
-        threading.Thread(target=_force_exit, daemon=True).start()
-        try:
-            sessions.stop_all(wait=False)
-        except Exception:
-            pass
-        # os._exit skips the session threads' finally blocks, so mihomo
-        # children must be reaped synchronously here or they leak.
-        if proxy_manager is not None:
-            try:
-                proxy_manager.stop_all()
-            except Exception:
-                pass
-        try:
-            server.should_exit = True
-        except Exception:
-            pass
+        # Cleanup must run before os._exit, which skips finally blocks and
+        # would otherwise strand the mihomo children. Shared with the
+        # /api/shutdown route via core.shutdown.
+        stop_everything(sessions, proxy_manager, server)
         os._exit(0)
 
     def _show_window() -> None:
@@ -248,8 +233,9 @@ def main(argv: list[str] | None = None) -> None:
             window.events.closing += _hide_to_tray
             webview.start()
     finally:
-        sessions.stop_all()
-        server.should_exit = True
+        # wait=True here: this is the normal exit path, not a hard os._exit,
+        # so session threads get a chance to close their browsers.
+        stop_everything(sessions, proxy_manager, server, wait=True)
         thread.join(timeout=5)
         try:
             runtime_info.unlink(missing_ok=True)
