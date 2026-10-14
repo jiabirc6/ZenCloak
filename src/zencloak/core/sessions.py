@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import cloakbrowser.browser as _cloakbrowser_browser
 from cloakbrowser import launch_persistent_context
 
+from .downloads import attach_download_handler
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
 from .health import PROBE_JS
 from .launchers import launch_extra_kernel
@@ -212,6 +213,10 @@ class SessionManager:
                 # The kernel does not patch speechSynthesis; rewrite the OS
                 # SAPI voice list to match the profile locale.
                 context.add_init_script(build_voices_init_script(profile.get("locale")))
+            # Chromium names downloads with an internal UUID and drops the
+            # site's filename, which leaves the file with no extension and
+            # therefore unopenable. This restores it.
+            attach_download_handler(context, self._downloads_dir(profile))
             with self._lock:
                 session["context"] = context
                 session["closer"] = closer
