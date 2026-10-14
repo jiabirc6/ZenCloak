@@ -128,5 +128,27 @@ def test_delete_subscription_rejects_bad_id(tmp_path):
 
     from zencloak.core.subscriptions import delete_subscription
 
-    with pytest.raises(ValueError, match="订阅 ID 无效"):
+    with pytest.raises(ValueError, match="订阅 ID"):
         delete_subscription(tmp_path, "../../etc")
+
+
+def test_read_paths_reject_bad_id_like_delete(tmp_path):
+    """Readers validate the ID too, not only the delete path.
+
+    Regression guard: delete_subscription checked sub_id while
+    get_subscription/load_nodes joined it onto a path unchecked. The join
+    includes a ``subscriptions`` segment so it could not actually escape
+    the root, but the inconsistency is now removed.
+    """
+    import pytest
+
+    from zencloak.core.subscriptions import (
+        get_subscription,
+        load_nodes,
+        refresh_subscription,
+    )
+
+    bad = "deadbeef123456"
+    for fn in (get_subscription, load_nodes, refresh_subscription):
+        with pytest.raises(ValueError, match="订阅 ID"):
+            fn(tmp_path, bad)

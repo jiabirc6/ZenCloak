@@ -350,12 +350,26 @@ def create_app(
     def proxy_list_subscriptions() -> list[dict]:
         return list_subscriptions(proxy_root())
 
-    @app.get("/api/proxy/subscriptions/{sub_id}/nodes")
-    def proxy_subscription_nodes(sub_id: str) -> list[dict]:
-        meta = get_subscription(proxy_root(), sub_id)
+    def subscription_or_404(sub_id: str) -> dict:
+        """Load a subscription, turning a bad ID or missing store into 404."""
+        try:
+            meta = get_subscription(proxy_root(), sub_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         if meta is None:
             raise HTTPException(status_code=404, detail="订阅不存在")
-        return meta["nodes"]
+        return meta
+
+    def subscription_nodes_or_404(sub_id: str) -> list[dict]:
+        """Load a subscription's full node list for a bad-ID-safe 404."""
+        try:
+            return load_nodes(proxy_root(), sub_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/api/proxy/subscriptions/{sub_id}/nodes")
+    def proxy_subscription_nodes(sub_id: str) -> list[dict]:
+        return subscription_or_404(sub_id)["nodes"]
 
     @app.post("/api/proxy/subscriptions/{sub_id}/refresh")
     def proxy_refresh_subscription(sub_id: str) -> dict:
@@ -368,8 +382,7 @@ def create_app(
 
     @app.delete("/api/proxy/subscriptions/{sub_id}")
     def proxy_delete_subscription(sub_id: str) -> dict:
-        if get_subscription(proxy_root(), sub_id) is None:
-            raise HTTPException(status_code=404, detail="订阅不存在")
+        subscription_or_404(sub_id)
         users = [
             profile["name"]
             for profile in store.list_profiles()
@@ -390,7 +403,7 @@ def create_app(
         if not sub_id or not node_name:
             raise HTTPException(status_code=400, detail="缺少订阅或节点")
         manager = require_proxy_manager()
-        nodes = load_nodes(proxy_root(), sub_id)
+        nodes = subscription_nodes_or_404(sub_id)
         node = next((item for item in nodes if item.get("name") == node_name), None)
         if node is None:
             raise HTTPException(status_code=404, detail="节点不存在")
@@ -410,7 +423,7 @@ def create_app(
         wanted = set(names)
         nodes = [
             item
-            for item in load_nodes(proxy_root(), sub_id)
+            for item in subscription_nodes_or_404(sub_id)
             if item.get("name") in wanted
         ]
         results = manager.test_nodes(nodes)

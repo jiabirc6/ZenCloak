@@ -17,11 +17,9 @@ work across kernels).
 
 from typing import Any, Callable
 
-import re
 from pathlib import Path
 
-# Must stay in sync with Profile.id in models.py.
-_PROFILE_ID_RE = re.compile(r"[0-9a-f]{12}")
+from .identifiers import require_id, resolve_within
 
 
 def _profile_dir(data_root: Any, profile: dict) -> Path:
@@ -32,14 +30,7 @@ def _profile_dir(data_root: Any, profile: dict) -> Path:
     invoking an adapter directly with a traversal ID. Validating here keeps
     the guarantee with the code that actually builds the path.
     """
-    profile_id = profile.get("id")
-    if not isinstance(profile_id, str) or not _PROFILE_ID_RE.fullmatch(profile_id):
-        raise ValueError(f"非法档案 ID: {profile_id!r}")
-    root = Path(data_root).resolve()
-    candidate = (root / profile_id).resolve()
-    if not candidate.is_relative_to(root):
-        raise ValueError(f"非法档案 ID: {profile_id!r}")
-    return candidate
+    return resolve_within(data_root, require_id(profile.get("id"), "档案 ID"))
 
 
 KERNELS: list[dict[str, str]] = [

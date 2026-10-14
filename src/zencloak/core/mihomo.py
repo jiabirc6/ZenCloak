@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import secrets
 import shutil
 import subprocess
@@ -16,11 +15,9 @@ from typing import Any
 
 import yaml
 
+from .identifiers import require_id, resolve_within
 from .proxy_runtime import ProxyHandle, allocate_ports
 from .subscriptions import load_nodes
-
-# Must stay in sync with Profile.id in models.py.
-_PROFILE_ID_RE = re.compile(r"[0-9a-f]{12}")
 
 MIHOMO_VERSION = "v1.19.29"
 MIHOMO_DOWNLOAD_URL = (
@@ -290,13 +287,10 @@ class ProxyManager:
 
     def _runtime_dir(self, profile_id: str) -> Path:
         """Resolve a per-profile runtime dir without escaping ``data_root``."""
-        if not _PROFILE_ID_RE.fullmatch(str(profile_id)):
-            raise MihomoError(f"非法档案 ID: {profile_id!r}")
-        root = (self.data_root / "runtime").resolve()
-        candidate = (root / profile_id).resolve()
-        if not candidate.is_relative_to(root):
-            raise MihomoError(f"非法档案 ID: {profile_id!r}")
-        return candidate
+        try:
+            return resolve_within(self.data_root / "runtime", require_id(profile_id, "档案 ID"))
+        except ValueError as exc:
+            raise MihomoError(str(exc)) from exc
 
     def stop_all(self) -> None:
         with self._lock:

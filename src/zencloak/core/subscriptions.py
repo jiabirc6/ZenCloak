@@ -1,5 +1,4 @@
 import json
-import re
 import shutil
 import urllib.request
 import uuid
@@ -8,6 +7,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 import yaml
+
+from .identifiers import require_id, resolve_within
 
 REGION_KEYWORDS = (
     ("美国", "US"),
@@ -42,6 +43,18 @@ def infer_region(node_name: str) -> str | None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sub_dir(data_root: str | Path, sub_id: str) -> Path:
+    """Resolve a subscription directory, validating the ID first.
+
+    Both read and write paths go through here. Previously only the delete
+    path validated ``sub_id``, so the readers joined a raw value onto the
+    path; that could not actually escape ``data_root`` (the join adds a
+    ``subscriptions`` segment, so ``..`` stops one level short), but the
+    inconsistency meant the guarantee lived in the wrong place.
+    """
+    return resolve_within(Path(data_root) / "subscriptions", require_id(sub_id, "订阅 ID"))
 
 
 def _fetch_url(url: str, timeout: float = 30.0) -> str:
@@ -171,9 +184,8 @@ def import_subscription(
     if not proxies:
         raise ValueError("订阅中没有可用节点")
 
-    root = Path(data_root) / "subscriptions"
     sub_id = uuid.uuid4().hex[:12]
-    sub_dir = root / sub_id
+    sub_dir = _sub_dir(data_root, sub_id)
     sub_dir.mkdir(parents=True, exist_ok=True)
     return _write_subscription(sub_dir, sub_id, name or "未命名订阅", text, proxies, provider_status)
 
@@ -184,7 +196,7 @@ def refresh_subscription(
     fetch: Callable[[str], str] = _fetch_url,
 ) -> dict[str, Any]:
     """Re-fetch proxy-providers for a stored subscription and rebuild nodes."""
-    sub_dir = Path(data_root) / "subscriptions" / sub_id
+    sub_dir = _sub_dir(data_root, sub_id)
     source_path = sub_dir / "source.yaml"
     if not source_path.exists():
         raise ValueError("订阅不存在")
@@ -229,7 +241,7 @@ def list_subscriptions(data_root: str | Path) -> list[dict[str, Any]]:
 def get_subscription(
     data_root: str | Path, sub_id: str
 ) -> dict[str, Any] | None:
-    meta_path = Path(data_root) / "subscriptions" / sub_id / "meta.json"
+    meta_path = _sub_dir(data_root, sub_id) / "meta.json"
     if not meta_path.exists():
         return None
     return json.loads(meta_path.read_text(encoding="utf-8"))
@@ -237,9 +249,7 @@ def get_subscription(
 
 def delete_subscription(data_root: str | Path, sub_id: str) -> bool:
     """Remove a stored subscription directory. Returns True when deleted."""
-    if not re.fullmatch(r"[0-9a-f]{12}", sub_id or ""):
-        raise ValueError("订阅 ID 无效")
-    sub_dir = Path(data_root) / "subscriptions" / sub_id
+    sub_dir = _sub_dir(data_root, sub_id)
     if not sub_dir.is_dir():
         return False
     shutil.rmtree(sub_dir)
@@ -252,7 +262,7 @@ def load_nodes(data_root: str | Path, sub_id: str) -> list[dict[str, Any]]:
     Prefers ``resolved.yaml`` (inline + expanded providers); falls back to
     ``source.yaml`` for subscriptions imported before provider expansion.
     """
-    sub_dir = Path(data_root) / "subscriptions" / sub_id
+    sub_dir = _sub_dir(data_root, sub_id)
     resolved_path = sub_dir / "resolved.yaml"
     source_path = sub_dir / "source.yaml"
     if resolved_path.exists():

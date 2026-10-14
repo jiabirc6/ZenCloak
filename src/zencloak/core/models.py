@@ -10,6 +10,7 @@ from .fingerprint import (
     HUMAN_PRESETS,
     SUPPORTED_SCREENS,
 )
+from .identifiers import ID_PATTERN
 
 _SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1"}
@@ -49,7 +50,7 @@ class ProxySettings(BaseModel):
 class Profile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: str = Field(pattern=r"^[0-9a-f]{12}$")
+    id: str = Field(pattern=ID_PATTERN)
     name: str = Field(min_length=1, max_length=32)
     color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
     notes: str = ""

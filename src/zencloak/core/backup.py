@@ -11,7 +11,6 @@ proxy password must be re-entered once per profile.
 """
 
 import json
-import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -19,10 +18,11 @@ from typing import Any
 
 import pyzipper
 
+from .identifiers import is_valid_id
+
 BACKUP_VERSION = 1
 MANIFEST_NAME = "backup-manifest.json"
 MIN_PASSPHRASE = 8
-_PROFILE_ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
 # Chromium cache dirs are disposable; login state lives in Cookies,
 # "Login Data", Local Storage etc. Excluding caches keeps archives small.
@@ -58,10 +58,10 @@ def _safe_member(name: str) -> tuple[str, str] | None:
         if not stem.endswith(".json"):
             return None
         pid = stem[:-5]
-        return ("profile", pid) if _PROFILE_ID_RE.match(pid) else None
+        return ("profile", pid) if is_valid_id(pid) else None
     if parts[0] == "data" and len(parts) >= 3:
         pid = parts[1]
-        return ("data", pid) if _PROFILE_ID_RE.match(pid) else None
+        return ("data", pid) if is_valid_id(pid) else None
     return None
 
 
@@ -96,7 +96,7 @@ def create_backup(
         zf.setpassword(passphrase.encode("utf-8"))
         for json_file in sorted(profiles_dir.glob("*.json")):
             pid = json_file.stem
-            if not _PROFILE_ID_RE.match(pid):
+            if not is_valid_id(pid):
                 continue
             if pid in running:
                 manifest["skipped_running"].append(pid)
