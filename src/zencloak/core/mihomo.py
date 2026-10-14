@@ -1,8 +1,10 @@
 import json
 import os
+import re
 import secrets
 import shutil
 import subprocess
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -16,6 +18,9 @@ import yaml
 
 from .proxy_runtime import ProxyHandle, allocate_ports
 from .subscriptions import load_nodes
+
+# Must stay in sync with Profile.id in models.py.
+_PROFILE_ID_RE = re.compile(r"[0-9a-f]{12}")
 
 MIHOMO_VERSION = "v1.19.29"
 MIHOMO_DOWNLOAD_URL = (
@@ -157,12 +162,22 @@ def generate_runtime_config(
 
 
 class ProxyManager:
-    """Owns one mihomo process per running profile."""
+    """Owns one mihomo process per running profile.
+
+    Thread safety: the FastAPI endpoints run handlers in a worker thread pool,
+    and ``test_nodes`` additionally fans out over its own pool, so ``start``
+    and ``stop`` can be entered concurrently for the same profile ID. ``start``
+    is a check-then-act spanning port allocation, config writing and process
+    spawn, so it holds ``_lock`` for its whole duration; without that, two
+    concurrent calls would each spawn a mihomo and the first process would
+    leak with no handle left to reap it.
+    """
 
     def __init__(self, data_root: str | Path, binary: Path | None = None) -> None:
         self.data_root = Path(data_root)
         self.binary = binary
         self._handles: dict[str, ProxyHandle] = {}
+        self._lock = threading.RLock()
 
     def start(
         self,
@@ -170,66 +185,78 @@ class ProxyManager:
         nodes: list[dict[str, Any]],
         node_name: str | None = None,
     ) -> ProxyHandle:
-        if profile_id in self._handles:
-            return self._handles[profile_id]
+        # RLock (not Lock): the failure path calls self.stop() while held.
+        with self._lock:
+            existing = self._handles.get(profile_id)
+            if existing is not None:
+                return existing
 
-        binary = self.binary or ensure_binary()
-        ports = allocate_ports(3)
-        secret = secrets.token_urlsafe(16)
-        work_dir = self.data_root / "runtime" / profile_id
-        work_dir.mkdir(parents=True, exist_ok=True)
-        config = generate_runtime_config(nodes, ports, secret)
-        config_path = work_dir / "config.yaml"
-        config_path.write_text(
-            yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
+            binary = self.binary or ensure_binary()
+            ports = allocate_ports(3)
+            secret = secrets.token_urlsafe(16)
+            work_dir = self._runtime_dir(profile_id)
+            work_dir.mkdir(parents=True, exist_ok=True)
+            config = generate_runtime_config(nodes, ports, secret)
+            config_path = work_dir / "config.yaml"
+            config_path.write_text(
+                yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
 
-        log_path = work_dir / "mihomo.log"
-        log_handle = log_path.open("a", encoding="utf-8")
-        process = subprocess.Popen(
-            [
-                str(binary),
-                "-d",
-                str(work_dir),
-                "-f",
-                str(config_path),
-            ],
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            creationflags=0x08000000,
-        )
-        (work_dir / MIHOMO_PID_FILE).write_text(str(process.pid), encoding="ascii")
-        handle = ProxyHandle(
-            profile_id=profile_id,
-            mixed_port=ports[0],
-            controller_port=ports[1],
-            dns_port=ports[2],
-            secret=secret,
-            work_dir=work_dir,
-            config_path=config_path,
-            process=process,
-            node=node_name,
-            status="starting",
-            started_at=datetime.now(timezone.utc).isoformat(),
-        )
-        self._handles[profile_id] = handle
+            log_path = work_dir / "mihomo.log"
+            log_handle = log_path.open("a", encoding="utf-8")
+            try:
+                process = subprocess.Popen(
+                    [
+                        str(binary),
+                        "-d",
+                        str(work_dir),
+                        "-f",
+                        str(config_path),
+                    ],
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,
+                    creationflags=0x08000000,
+                )
+            except Exception:
+                # Never strand the log descriptor when the spawn itself fails.
+                log_handle.close()
+                raise
+            (work_dir / MIHOMO_PID_FILE).write_text(
+                str(process.pid), encoding="ascii"
+            )
+            handle = ProxyHandle(
+                profile_id=profile_id,
+                mixed_port=ports[0],
+                controller_port=ports[1],
+                dns_port=ports[2],
+                secret=secret,
+                work_dir=work_dir,
+                config_path=config_path,
+                process=process,
+                node=node_name,
+                status="starting",
+                started_at=datetime.now(timezone.utc).isoformat(),
+                log_handle=log_handle,
+            )
+            self._handles[profile_id] = handle
 
-        try:
-            self._wait_ready(handle)
-            if node_name:
-                self._select_node(handle, node_name)
-            handle.status = "running"
-            handle.error = None
-        except Exception as exc:
-            handle.status = "error"
-            handle.error = f"{type(exc).__name__}: {exc}"
-            self.stop(profile_id)
-            raise MihomoError(handle.error) from exc
-        return handle
+            try:
+                self._wait_ready(handle)
+                if node_name:
+                    self._select_node(handle, node_name)
+                handle.status = "running"
+                handle.error = None
+            except Exception as exc:
+                handle.status = "error"
+                handle.error = f"{type(exc).__name__}: {exc}"
+                self.stop(profile_id)
+                raise MihomoError(handle.error) from exc
+            return handle
 
     def stop(self, profile_id: str) -> None:
-        handle = self._handles.pop(profile_id, None)
+        with self._lock:
+            handle = self._handles.pop(profile_id, None)
         if handle is None:
             return
         process = handle.process
@@ -239,13 +266,42 @@ class ProxyManager:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+        self._close_log(handle)
         try:
             (handle.work_dir / MIHOMO_PID_FILE).unlink(missing_ok=True)
         except OSError:
             pass
 
+    @staticmethod
+    def _close_log(handle: ProxyHandle) -> None:
+        """Close the mihomo log descriptor exactly once."""
+        log_handle = getattr(handle, "log_handle", None)
+        if log_handle is None:
+            return
+        handle.log_handle = None
+        try:
+            log_handle.close()
+        except Exception:  # noqa: BLE001 - cleanup must never raise
+            pass
+
+    def _runtime_dir(self, profile_id: str) -> Path:
+        """Resolve a per-profile runtime dir without escaping ``data_root``."""
+        if not _PROFILE_ID_RE.fullmatch(str(profile_id)):
+            raise MihomoError(f"非法档案 ID: {profile_id!r}")
+        root = (self.data_root / "runtime").resolve()
+        candidate = (root / profile_id).resolve()
+        if not candidate.is_relative_to(root):
+            raise MihomoError(f"非法档案 ID: {profile_id!r}")
+        return candidate
+
     def stop_all(self) -> None:
-        for profile_id in list(self._handles):
+        with self._lock:
+            profile_ids = list(self._handles)
+        for profile_id in profile_ids:
             self.stop(profile_id)
 
     def sweep_orphans(self) -> int:
@@ -276,7 +332,8 @@ class ProxyManager:
         return killed
 
     def status(self, profile_id: str) -> dict[str, Any]:
-        handle = self._handles.get(profile_id)
+        with self._lock:
+            handle = self._handles.get(profile_id)
         if handle is None:
             return {"profile_id": profile_id, "status": "stopped"}
         return {
@@ -338,7 +395,8 @@ class ProxyManager:
         )
 
     def detect_exit_ip(self, profile_id: str, timeout: float = 15.0) -> str:
-        handle = self._handles.get(profile_id)
+        with self._lock:
+            handle = self._handles.get(profile_id)
         if handle is None or handle.status != "running":
             raise MihomoError("代理未运行")
         proxy_handler = urllib.request.ProxyHandler(

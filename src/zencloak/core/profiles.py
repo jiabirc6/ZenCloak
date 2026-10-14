@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -7,6 +8,9 @@ from pathlib import Path
 from .fingerprint import default_profile_draft
 from .models import Profile
 from .secrets import decrypt_text, encrypt_text
+
+# Must stay in sync with Profile.id in models.py.
+_PROFILE_ID_RE = re.compile(r"[0-9a-f]{12}")
 
 
 def _now_iso() -> str:
@@ -64,6 +68,27 @@ class ProfileStore:
         if not resolved.is_relative_to(root.resolve()):
             raise ValueError(f"非法档案 ID: {name!r}")
         return resolved
+
+    @staticmethod
+    def _validate_profile_id(profile_id: str) -> str:
+        """Reject profile IDs that could escape the store when joined to a path.
+
+        Every path built from a caller-supplied profile ID must go through
+        this first, so a traversal cannot reach the filesystem even before
+        the profile is looked up.
+        """
+        if not isinstance(profile_id, str) or not _PROFILE_ID_RE.fullmatch(profile_id):
+            raise ValueError(f"非法档案 ID: {profile_id!r}")
+        return profile_id
+
+    def profile_data_subdir(self, profile_id: str, *parts: str) -> Path:
+        """Path to a per-profile subdirectory, validated against traversal.
+
+        Used for derived locations (Downloads, screenshots) that live inside
+        the profile's data directory but are not the data dir itself.
+        """
+        self._validate_profile_id(profile_id)
+        return self._resolve_within(self.data_dir, profile_id).joinpath(*parts)
 
     def _write(self, profile: dict) -> None:
         with self._path(profile["id"]).open("w", encoding="utf-8") as handle:

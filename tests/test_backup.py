@@ -5,6 +5,7 @@ import pyzipper
 import pytest
 
 from zencloak.core.backup import BackupError, create_backup, restore_backup
+from zencloak.core.profiles import ProfileStore
 
 PASS = "correct-horse-battery"
 
@@ -109,3 +110,70 @@ def test_restore_rejects_path_traversal(tmp_path):
     with pytest.raises(BackupError):
         restore_backup(archive, PASS, tmp_path / "dst")
     assert not (tmp_path / "dst" / "evil.txt").exists()
+
+
+def test_restore_is_all_or_nothing_on_illegal_member(tmp_path):
+    """A rejected archive must not leave a partially restored store.
+
+    Regression guard: the old implementation walked members and wrote each
+    valid one as it went, so an illegal member appearing later raised after
+    earlier profiles had already been written to disk.
+    """
+    dst = tmp_path / "dst"
+    ProfileStore(dst, auto_init=False)
+    archive = tmp_path / "mixed.zip"
+    victim_id = "111111111111"
+    good_profile = {
+        "id": victim_id,
+        "name": "部分导入测试",
+        "color": "#ffffff",
+        "seed": 12345,
+        "timezone": "UTC",
+        "locale": "zh-CN",
+        "platform": "windows",
+        "screen_width": 1920,
+        "screen_height": 1080,
+        "hardware_concurrency": 8,
+        "device_memory": 8,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00",
+    }
+    with pyzipper.AESZipFile(
+        archive, "w", compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES
+    ) as zf:
+        zf.setpassword(PASS.encode("utf-8"))
+        zf.writestr(
+            "backup-manifest.json",
+            json.dumps({"version": 1, "include_data": True, "profiles": []}),
+        )
+        # Valid member first, illegal member second: the old code wrote the
+        # first one before discovering the second.
+        zf.writestr(f"profiles/{victim_id}.json", json.dumps(good_profile))
+        zf.writestr("profiles/../../evil.json", "{}")
+
+    with pytest.raises(BackupError):
+        restore_backup(archive, PASS, dst)
+
+    assert not (dst / "profiles" / f"{victim_id}.json").exists()
+    assert not (tmp_path / "evil.json").exists()
+
+
+def test_restore_rejects_unreadable_member_before_writing(tmp_path):
+    """A corrupt member fails the pre-pass, before any write happens."""
+    dst = tmp_path / "dst"
+    ProfileStore(dst, auto_init=False)
+    archive = tmp_path / "truncated.zip"
+    with pyzipper.AESZipFile(
+        archive, "w", compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES
+    ) as zf:
+        zf.setpassword(PASS.encode("utf-8"))
+        zf.writestr(
+            "backup-manifest.json",
+            json.dumps({"version": 1, "include_data": True, "profiles": []}),
+        )
+        zf.writestr("profiles/222222222222.json", json.dumps({"id": "222222222222"}))
+
+    # Wrong passphrase: the manifest cannot be decrypted, so nothing is written.
+    with pytest.raises(BackupError):
+        restore_backup(archive, "wrong-passphrase", dst)
+    assert list((dst / "profiles").glob("*.json")) == []

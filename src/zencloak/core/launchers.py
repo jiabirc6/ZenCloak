@@ -17,6 +17,31 @@ work across kernels).
 
 from typing import Any, Callable
 
+import re
+from pathlib import Path
+
+# Must stay in sync with Profile.id in models.py.
+_PROFILE_ID_RE = re.compile(r"[0-9a-f]{12}")
+
+
+def _profile_dir(data_root: Any, profile: dict) -> Path:
+    """Resolve the profile's data dir, rejecting IDs that escape ``data_root``.
+
+    Kernel adapters are a public entry point: ``SessionManager`` already
+    validates the ID, but a second caller must not be able to bypass that by
+    invoking an adapter directly with a traversal ID. Validating here keeps
+    the guarantee with the code that actually builds the path.
+    """
+    profile_id = profile.get("id")
+    if not isinstance(profile_id, str) or not _PROFILE_ID_RE.fullmatch(profile_id):
+        raise ValueError(f"非法档案 ID: {profile_id!r}")
+    root = Path(data_root).resolve()
+    candidate = (root / profile_id).resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError(f"非法档案 ID: {profile_id!r}")
+    return candidate
+
+
 KERNELS: list[dict[str, str]] = [
     {"id": "cloak", "label": "CloakBrowser（默认·Chromium stealth）", "stealth": "full"},
     {"id": "camoufox", "label": "Camoufox（实验性·Firefox stealth）", "stealth": "experimental"},
@@ -99,7 +124,7 @@ def launch_chromium(
 
     kwargs = _chromium_kwargs(
         profile,
-        str(data_root / profile["id"]),
+        str(_profile_dir(data_root, profile)),
         proxy_server,
         cdp_port,
         ext_dir,
@@ -131,7 +156,7 @@ def launch_camoufox(
     options: dict[str, Any] = {
         "headless": False,
         "persistent_context": True,
-        "user_data_dir": str(data_root / profile["id"]),
+        "user_data_dir": str(_profile_dir(data_root, profile)),
         "os": "windows",
         "locale": profile["locale"],
         # Camoufox's fingerprint engine reads timezone from its config dict,

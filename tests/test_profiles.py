@@ -38,6 +38,45 @@ def test_rejects_traversal_profile_id_on_delete(store):
         store.delete_profile("..\\..\\..\\x")
 
 
+@pytest.mark.parametrize(
+    "bad_id",
+    [
+        "..\\..\\..\\x",
+        "../../../x",
+        "0123456789ab/../..",
+        "a" * 12 + "/../../x",
+        "",
+        "x",
+        "ZZZZZZZZZZZZ",
+        "0123456789AB",
+        None,
+        123,
+    ],
+)
+def test_profile_data_subdir_rejects_invalid_ids(store, bad_id):
+    """Derived per-profile paths must not escape the store root.
+
+    ``profile_data_subdir`` backs the screenshot and Downloads locations,
+    which previously joined a raw URL path parameter onto the data dir.
+    """
+    with pytest.raises((ValueError, TypeError)):
+        store.profile_data_subdir(bad_id, "screenshots")
+
+
+def test_profile_data_subdir_accepts_valid_id_and_stays_inside(store, tmp_path):
+    profile = store.create_profile(_draft())
+    resolved = store.profile_data_subdir(profile["id"], "screenshots").resolve()
+    assert resolved.is_relative_to(store.data_dir.resolve())
+    assert resolved.name == "screenshots"
+
+
+def test_profile_data_subdir_does_not_create_directories(store):
+    """The helper only resolves paths; callers decide when to mkdir."""
+    profile = store.create_profile(_draft())
+    subdir = store.profile_data_subdir(profile["id"], "screenshots")
+    assert not subdir.exists()
+
+
 def test_list_profiles_returns_copies(store):
     first = store.create_profile(_draft("甲档案"))
     second = store.create_profile(_draft("乙档案"))

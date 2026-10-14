@@ -336,6 +336,23 @@ class SessionManager:
             "cdp_endpoint": f"http://127.0.0.1:{port}" if port else None,
         }
 
+    def _profile_dir(self, profile: dict) -> Path:
+        """Resolve a profile's data directory, rejecting traversal IDs.
+
+        Session code receives the profile dict from the API, but the ID still
+        originates from a URL path parameter, so it is re-validated here rather
+        than trusted. Any path built from ``profile["id"]`` must go through
+        this helper.
+        """
+        return self._resolve_profile_path(profile["id"])
+
+    def _resolve_profile_path(self, profile_id: str, *parts: str) -> Path:
+        root = self.data_root.resolve()
+        candidate = (root / profile_id).joinpath(*parts).resolve()
+        if not candidate.is_relative_to(root):
+            raise SessionError(f"非法档案 ID: {profile_id!r}")
+        return candidate
+
     def _build_launch_kwargs(
         self,
         profile: dict,
@@ -357,7 +374,7 @@ class SessionManager:
         if profile.get("user_agent"):
             args.append(f"--user-agent={profile['user_agent']}")
         kwargs: dict[str, Any] = {
-            "user_data_dir": str(self.data_root / profile["id"]),
+            "user_data_dir": str(self._profile_dir(profile)),
             "headless": False,
             "args": args,
             "timezone": profile["timezone"],
@@ -365,7 +382,7 @@ class SessionManager:
             "human_preset": profile["human_preset"],
             "accept_downloads": True,
         }
-        downloads_dir = self.data_root / profile["id"] / "Downloads"
+        downloads_dir = self._resolve_profile_path(profile["id"], "Downloads")
         downloads_dir.mkdir(parents=True, exist_ok=True)
         kwargs["downloads_path"] = str(downloads_dir)
         kwargs["extension_paths"] = [self._extension_dir(profile)]

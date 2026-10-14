@@ -44,3 +44,6 @@ class ProxyHandle:
     status: str = "starting"
     error: str | None = None
     started_at: str = ""
+    # Kept so stop() can close it; otherwise every start/stop cycle leaks a
+    # file descriptor (the mihomo log is opened for append, never closed).
+    log_handle: Any = field(default=None, repr=False)

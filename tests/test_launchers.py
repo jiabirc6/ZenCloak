@@ -72,3 +72,35 @@ def test_chromium_kwargs_user_agent():
 def test_unknown_kernel_raises():
     with pytest.raises(RuntimeError, match="未知内核"):
         launch_extra_kernel("netscape", _profile(), None, None, None)
+
+
+@pytest.mark.parametrize(
+    "bad_id",
+    ["../../../escaped", "..\\..\\escaped", "not-hex-here", "", "ABCDEFABCDEF", None],
+)
+def test_profile_dir_rejects_traversal_ids(tmp_path, bad_id):
+    """Adapters validate the profile ID themselves.
+
+    SessionManager already validates, but a direct adapter call must not be a
+    way around that check.
+    """
+    from zencloak.core.launchers import _profile_dir
+
+    with pytest.raises(ValueError):
+        _profile_dir(tmp_path, _profile(id=bad_id))
+
+
+def test_profile_dir_accepts_valid_id_and_stays_inside(tmp_path):
+    from zencloak.core.launchers import _profile_dir
+
+    resolved = _profile_dir(tmp_path, _profile())
+    assert resolved == (tmp_path / "aaaaaaaaaaaa").resolve()
+    assert resolved.is_relative_to(tmp_path.resolve())
+
+
+def test_launch_chromium_rejects_traversal_before_launch(tmp_path):
+    """The guard runs before Playwright is imported, so nothing is spawned."""
+    with pytest.raises(ValueError):
+        launch_extra_kernel(
+            "chromium", _profile(id="../../escaped"), tmp_path, None, None, None
+        )

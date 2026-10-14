@@ -127,6 +127,59 @@ def create_backup(
     }
 
 
+def _plan_restore(
+    names: list[str],
+    existing_ids: set[str],
+    running: set[str],
+    overwrite: bool,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[str], list[str], list[str]]:
+    """Validate every member and decide the full plan before touching disk.
+
+    Returns ``(profile_writes, data_writes, restored, skipped_existing,
+    skipped_running)`` where the write lists hold ``(member_name, profile_id)``
+    pairs. Raising here means nothing has been written yet, so a rejected
+    archive can never leave a half-imported store behind.
+    """
+    profile_writes: list[tuple[str, str]] = []
+    data_writes: list[tuple[str, str]] = []
+    restored: list[str] = []
+    skipped_existing: list[str] = []
+    skipped_running: list[str] = []
+    # Data members are dropped for any profile that is not actually being
+    # (re)written, so the skip decisions made below govern both kinds.
+    decided_skip: set[str] = set()
+
+    for name in names:
+        member = _safe_member(name)
+        if member is None:
+            raise BackupError(f"备份包含非法路径：{name}")
+        kind, pid = member
+        if kind == "profile":
+            if pid in existing_ids and not overwrite:
+                skipped_existing.append(pid)
+                decided_skip.add(pid)
+                continue
+            if pid in running:
+                skipped_running.append(pid)
+                decided_skip.add(pid)
+                continue
+            profile_writes.append((name, pid))
+            restored.append(pid)
+        else:
+            data_writes.append((name, pid))
+
+    data_writes = [
+        (name, pid) for name, pid in data_writes if pid not in decided_skip
+    ]
+    return (
+        profile_writes,
+        data_writes,
+        restored,
+        skipped_existing,
+        skipped_running,
+    )
+
+
 def restore_backup(
     archive_path: str | Path,
     passphrase: str,
@@ -135,16 +188,16 @@ def restore_backup(
     overwrite: bool = False,
 ) -> dict[str, Any]:
     """Decrypt an archive back into the store. Existing profiles are skipped
-    unless overwrite=True; data of running profiles is never touched."""
+    unless overwrite=True; data of running profiles is never touched.
+
+    The archive is validated in full before anything is written, so a rejected
+    or corrupt archive cannot leave a partially restored store.
+    """
     root = Path(store_root)
     profiles_dir = root / "profiles"
     data_dir = root / "data"
     profiles_dir.mkdir(parents=True, exist_ok=True)
     running = set(running_ids)
-    restored: list[str] = []
-    skipped_existing: list[str] = []
-    skipped_running: list[str] = []
-    data_restored: list[str] = []
 
     try:
         zf = pyzipper.AESZipFile(Path(archive_path))
@@ -159,36 +212,37 @@ def restore_backup(
         if manifest.get("version") != BACKUP_VERSION:
             raise BackupError(f"不支持的备份版本：{manifest.get('version')}")
 
-        pending_data: dict[str, list[str]] = {}
-        for name in zf.namelist():
-            if name == MANIFEST_NAME:
-                continue
-            member = _safe_member(name)
-            if member is None:
-                raise BackupError(f"备份包含非法路径：{name}")
-            kind, pid = member
-            if kind == "profile":
-                target = profiles_dir / f"{pid}.json"
-                if target.exists() and not overwrite:
-                    skipped_existing.append(pid)
-                    continue
-                if pid in running:
-                    skipped_running.append(pid)
-                    continue
-                target.write_bytes(zf.read(name))
-                restored.append(pid)
-            else:
-                if pid in skipped_existing or pid in skipped_running or pid in running:
-                    continue
-                pending_data.setdefault(pid, []).append(name)
+        # Read every member once, up front: a truncated or tampered archive
+        # must fail here rather than midway through the writes below.
+        payloads: dict[str, bytes] = {}
+        member_names = [n for n in zf.namelist() if n != MANIFEST_NAME]
+        for name in member_names:
+            try:
+                payloads[name] = zf.read(name)
+            except Exception as exc:
+                raise BackupError(f"备份成员无法读取：{name}（{exc}）") from exc
 
-        for pid, names in pending_data.items():
-            for name in names:
-                relative = PurePosixPath(name).parts[2:]
-                target = data_dir / pid / Path(*relative)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(zf.read(name))
-            data_restored.append(pid)
+    existing_ids = {path.stem for path in profiles_dir.glob("*.json")}
+    (
+        profile_writes,
+        data_writes,
+        restored,
+        skipped_existing,
+        skipped_running,
+    ) = _plan_restore(member_names, existing_ids, running, overwrite)
+
+    data_restored: list[str] = []
+    for name, pid in profile_writes:
+        (profiles_dir / f"{pid}.json").write_bytes(payloads[name])
+
+    data_pids: set[str] = set()
+    for name, pid in data_writes:
+        relative = PurePosixPath(name).parts[2:]
+        target = data_dir / pid / Path(*relative)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payloads[name])
+        data_pids.add(pid)
+    data_restored = sorted(data_pids)
 
     return {
         "restored": restored,

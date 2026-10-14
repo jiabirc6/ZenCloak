@@ -1,3 +1,6 @@
+import time
+
+import pytest
 import yaml
 
 from zencloak.core.mihomo import generate_runtime_config
@@ -121,3 +124,144 @@ def test_stop_all_pops_all_handles(tmp_path):
     manager = ProxyManager(data_root=tmp_path)
     manager.stop_all()  # 空句柄不报错
     assert manager._handles == {}
+
+
+def test_manager_exposes_a_reentrant_lock(tmp_path):
+    """start() holds the lock across a check-then-act and calls stop() on
+    failure, so the lock must be reentrant or that path self-deadlocks."""
+    import threading
+
+    from zencloak.core.mihomo import ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+    assert isinstance(manager._lock, type(threading.RLock()))
+    with manager._lock:
+        with manager._lock:  # must not deadlock
+            pass
+
+
+def test_concurrent_start_spawns_only_one_process(tmp_path, monkeypatch):
+    """Two concurrent start() calls for one profile must not both spawn.
+
+    Regression guard for the unlocked check-then-act: previously both callers
+    passed the ``profile_id in self._handles`` check and each started a mihomo,
+    leaking the first process with no handle left to reap it.
+    """
+    import threading
+
+    from zencloak.core import mihomo as mihomo_module
+    from zencloak.core.mihomo import ProxyManager
+
+    spawn_count = 0
+    spawn_lock = threading.Lock()
+
+    class FakeProcess:
+        def __init__(self):
+            self.pid = 4242
+            self.returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    def fake_popen(*args, **kwargs):
+        nonlocal spawn_count
+        with spawn_lock:
+            spawn_count += 1
+        # Widen the window the old racing code would have slipped through.
+        time.sleep(0.05)
+        return FakeProcess()
+
+    monkeypatch.setattr(mihomo_module.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(ProxyManager, "_wait_ready", lambda self, handle, timeout=10.0: None)
+    monkeypatch.setattr(
+        mihomo_module, "ensure_binary", lambda bin_dir=None: tmp_path / "mihomo.exe"
+    )
+
+    manager = ProxyManager(data_root=tmp_path)
+    results: list[object] = []
+    errors: list[BaseException] = []
+    barrier = threading.Barrier(4)
+
+    def worker():
+        barrier.wait()
+        try:
+            results.append(manager.start("aaaaaaaaaaaa", _nodes()))
+        except BaseException as exc:  # noqa: BLE001 - recorded for the assert
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert errors == []
+    assert spawn_count == 1, f"应只启动 1 个 mihomo，实际 {spawn_count}"
+    assert len({id(handle) for handle in results}) == 1
+    manager.stop_all()
+
+
+def test_stop_closes_log_handle(tmp_path, monkeypatch):
+    """Every start/stop cycle must release the mihomo log descriptor."""
+    from zencloak.core import mihomo as mihomo_module
+    from zencloak.core.mihomo import ProxyManager
+
+    class FakeProcess:
+        pid = 4242
+        returncode = None
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(
+        mihomo_module.subprocess, "Popen", lambda *a, **k: FakeProcess()
+    )
+    monkeypatch.setattr(ProxyManager, "_wait_ready", lambda self, handle, timeout=10.0: None)
+    monkeypatch.setattr(
+        mihomo_module, "ensure_binary", lambda bin_dir=None: tmp_path / "mihomo.exe"
+    )
+
+    manager = ProxyManager(data_root=tmp_path)
+    handle = manager.start("aaaaaaaaaaaa", _nodes())
+    log_handle = handle.log_handle
+    assert log_handle is not None
+    assert not log_handle.closed
+
+    manager.stop("aaaaaaaaaaaa")
+    assert log_handle.closed, "日志句柄未关闭（fd 泄漏）"
+    assert handle.log_handle is None
+
+
+def test_runtime_dir_rejects_traversal(tmp_path):
+    from zencloak.core.mihomo import MihomoError, ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+    with pytest.raises(MihomoError):
+        manager._runtime_dir("../../escaped")
+
+
+def test_runtime_dir_accepts_valid_id(tmp_path):
+    from zencloak.core.mihomo import ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+    resolved = manager._runtime_dir("aaaaaaaaaaaa")
+    assert resolved == (tmp_path / "runtime" / "aaaaaaaaaaaa").resolve()
+    assert resolved.is_relative_to(tmp_path.resolve())

@@ -120,7 +120,10 @@ def create_app(
     @app.post("/api/profiles/{profile_id}/open-downloads")
     def open_profile_downloads(profile_id: str) -> dict:
         profile_or_404(profile_id)
-        downloads_dir = store.data_dir / profile_id / "Downloads"
+        try:
+            downloads_dir = store.profile_data_subdir(profile_id, "Downloads")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         downloads_dir.mkdir(parents=True, exist_ok=True)
         try:
             os.startfile(str(downloads_dir))
@@ -539,9 +542,14 @@ def create_app(
 
     @app.post("/api/sessions/{profile_id}/pages/{index}/screenshot")
     def session_page_screenshot(profile_id: str, index: int) -> dict:
-        shots_dir = (
-            sessions.data_root / profile_id / "screenshots"
-        )
+        # Validate the ID (and confirm the profile exists) before touching the
+        # filesystem: this route used to mkdir from a raw path parameter, so a
+        # traversal could create directories anywhere before the ID was checked.
+        profile_or_404(profile_id)
+        try:
+            shots_dir = store.profile_data_subdir(profile_id, "screenshots")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         shots_dir.mkdir(parents=True, exist_ok=True)
         path = shots_dir / f"{time.strftime('%Y%m%d-%H%M%S')}.png"
         return _page_op_or_409(
