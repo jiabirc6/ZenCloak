@@ -92,6 +92,31 @@ gh release upload v0.4.0 installer/ZenCloak-Setup-0.4.0-dir.exe
 
 只上传公开版两个安装包；内置版不上传。
 
+**上传后必须给两个资产加 label**，否则用户在 Release 页面看到 `ZenCloak-Setup-0.4.0.exe` 和 `ZenCloak-Setup-0.4.0-dir.exe` 无从分辨，只会下载名字更"正常"的那个（历史数据显示 onedir 版因此几乎无人下载）。
+
+`gh release edit` **不支持**设置资产 label，要用 REST API。先取资产 ID：
+
+```powershell
+gh api repos/jiabirc6/ZenCloak/releases/tags/v0.4.0 --jq '.assets[] | "\(.id) \(.name)"'
+```
+
+再逐个 PATCH（ID 换成上一步的输出）：
+
+```powershell
+gh api --method PATCH repos/jiabirc6/ZenCloak/releases/assets/<dir-id> `
+  -f label="启动快（1-2 秒）· 文件夹版"
+gh api --method PATCH repos/jiabirc6/ZenCloak/releases/assets/<exe-id> `
+  -f label="单文件便携版（启动约 20 秒）"
+```
+
+验证：
+
+```powershell
+gh api repos/jiabirc6/ZenCloak/releases/tags/v0.4.0 --jq '.assets[] | "\(.name)  label=\(.label)"'
+```
+
+Release 正文的「安装」段落要同时列出两个包并说明区别，不要只写单文件版的文件名（见 `installer/release-notes-0.4.0.md`）。
+
 ## 说明
 
 - 单文件 EXE，不显示控制台窗口

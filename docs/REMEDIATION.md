@@ -16,7 +16,7 @@
 | P2 | R7 CDP attach 模式 | 给外部 Playwright/Selenium 脚本暴露调试端口 | 小 | ✅ 已完成（E2E 通过） |
 | P3 | R8 app.js 拆分 | 1209 行单文件，新功能进来前先模块化 | 中 | 待做 |
 | P3 | R9 英文 README | 零成本海外流量 | 极小 | ✅ 已完成（1aa5291） |
-| P3 | R10 onedir 默认发布 | 20s 启动劝退问题 | 小 | 待做 |
+| P3 | R10 onedir 被看见（原「默认发布」改为并列展示） | 20s 启动劝退问题；诊断发现是用户不知道有 onedir | 小 | ✅ 已完成（README/Release/label 三处） |
 | 快赢 | R11 list_pages MCP 校验 bug | 今天实测发现：返回 JSON 字符串导致 Pydantic 报错 | 极小 | ✅ 已修（63cb4d9） |
 | 快赢 | R12 mihomo 强杀残留 | 托盘退出 os._exit 路径留孤儿进程 | 小 | ✅ 已修（af9d05b） |
 
@@ -104,8 +104,26 @@
 ### R9：英文 README
 `README.en.md` + 顶部语言切换链接；`site/` 加英文首页。
 
-### R10：onedir 为默认发布
-Release 同时提供 onedir zip（推荐，1-2s 启动）与 onefile exe（便携）；README 安装指引改推 onedir。
+### R10：让 onedir 版被看见（原方案改为并列展示）
+**原方案**：Release 同时提供 onedir zip 与 onefile exe，README 安装指引**改推 onedir**。
+
+**实际诊断（2026-10-14）**：onedir 版早已上传，但三个版本累计仅 2 次下载（v0.4.0/v0.3.0 各 0 次），而 onefile 版 13 次。核实原因**不是用户不在意启动速度**，而是根本不知道有这选项：
+
+- `README.md` 下载段只写「Download `ZenCloak-Setup-*.exe`」，未解释两个包的区别
+- Release 正文的「安装」段落**明确只写单文件版文件名**，主动把用户导向 onefile
+- 两个资产的 label 都是空的，用户只能靠 `-dir` 后缀猜
+- README 里唯一提到 onedir 的句子在「Install (development)」章节，且措辞是「自己去 build」，普通用户不会读到
+
+**改为并列展示（不做预设推荐）**：两个包地位平等，讲清区别让用户自己选。理由是**没有证据**表明用户更在意启动速度，而 onedir 的文件夹形式在卸载/移动/分发上反而更麻烦；先并列展示拿到真实下载数据，再决定是否改默认。
+
+**已完成**：
+1. README 中英双版下载段加对比表（启动速度 / 打包形式 / 适合场景），并说明「拿不准随便选一个」
+2. v0.4.0 Release 资产加 label（经 `gh api PATCH .../releases/assets/<id>`，`gh release edit` 不支持此字段）
+3. Release 正文安装段落改为并列两个包（线上已更新 + `installer/release-notes-0.4.0.md` 同步）
+4. README「Install (development)」里那句 onedir 说明移到下载段/打包文档
+5. `docs/packaging.md` 补「上传后必须加 label」及正确的 API 命令
+
+**验收**：下一个版本的 onedir 下载量若仍为 0，说明用户确实不在意启动速度，R10 应关闭而非继续投入。
 
 ---
 

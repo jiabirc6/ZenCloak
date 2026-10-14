@@ -28,9 +28,18 @@ Full changelog: [CHANGELOG.md](CHANGELOG.md).
 
 ## Download
 
-Latest installer: [ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
+Latest release: [ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
 
-Download `ZenCloak-Setup-*.exe` and run it — no admin rights required. On first browser launch, if the CloakBrowser kernel is missing, ZenCloak downloads the ~200 MB stealth Chromium binary automatically and caches it under `~/.cloakbrowser/`.
+Every release ships **two installers**. Both install the same application and need no admin rights — the only difference is how the app is packaged:
+
+| Asset | Startup | Packaged as | Good for |
+|---|---|---|---|
+| `ZenCloak-Setup-<version>-dir.exe` | **~1–2 s** | A folder | Everyday use |
+| `ZenCloak-Setup-<version>.exe` | ~20 s | A single file | Copying to a USB stick |
+
+The single-file build unpacks its dependencies to a temp folder on every start, which is what costs the extra ~18 s. The folder build keeps them on disk and starts immediately. Not sure? Either is fine — you can switch later by installing the other one.
+
+On first browser launch, if the CloakBrowser kernel is missing, ZenCloak downloads the ~200 MB stealth Chromium binary automatically and caches it under `~/.cloakbrowser/`.
 
 ## Features
 
@@ -66,7 +75,7 @@ python -m cloakbrowser install   # download the stealth Chromium binary
 
 ## Run
 
-Packaged users: just double-click `dist\ZenCloak.exe` (single file, no console window).
+Packaged users: launch ZenCloak from the Start Menu shortcut the installer created (no console window).
 
 Development mode:
 
@@ -74,7 +83,7 @@ Development mode:
 python -m zencloak
 ```
 
-> Keep the terminal open while `python -m zencloak` runs. The single-file EXE unpacks dependencies on start and takes ~20 s; see [docs/packaging.md](docs/packaging.md) to build a fast-start onedir version (~1-2 s).
+> Keep the terminal open while `python -m zencloak` runs. To build your own installers, including the fast-start onedir variant (~1–2 s vs ~20 s), see [docs/packaging.md](docs/packaging.md).
 
 ## Usage
 

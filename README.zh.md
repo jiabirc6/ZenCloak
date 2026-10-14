@@ -32,9 +32,18 @@ ZenCloak 以「指纹档案」为单位管理多个浏览器身份：每个档�
 
 ## 下载安装
 
-最新安装包：[ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
+最新版本：[ZenCloak Setup](https://github.com/jiabirc6/ZenCloak/releases/latest)
 
-下载 `ZenCloak-Setup-*.exe` 后双击安装即可，无需管理员权限。首次启动浏览器档案时，若本机没有 CloakBrowser 内核，ZenCloak 会自动下载约 200MB 的 stealth Chromium 二进制并缓存在 `~/.cloakbrowser/`。
+每个版本都提供**两个安装包**，装出来的程序完全一样，都无需管理员权限，区别只在打包方式：
+
+| 文件 | 启动速度 | 打包形式 | 适合场景 |
+|---|---|---|---|
+| `ZenCloak-Setup-<版本>-dir.exe` | **约 1–2 秒** | 文件夹 | 日常使用 |
+| `ZenCloak-Setup-<版本>.exe` | 约 20 秒 | 单个文件 | 拷到 U 盘携带 |
+
+单文件版每次启动都要先把内部依赖解压到临时目录，多出的约 18 秒就花在这里；文件夹版依赖已在磁盘上就位，启动即开。**拿不准就随便选一个** —— 以后想换，装另一个即可。
+
+首次启动浏览器档案时，若本机没有 CloakBrowser 内核，ZenCloak 会自动下载约 200MB 的 stealth Chromium 二进制并缓存在 `~/.cloakbrowser/`。
 
 ## 特性
 
@@ -70,7 +79,7 @@ python -m cloakbrowser install   # 下载 stealth Chromium 二进制
 
 ## 启动
 
-已打包用户直接双击 `dist\ZenCloak.exe`，单文件、无控制台窗口。
+安装包用户：从开始菜单快捷方式启动即可（无控制台窗口）。
 
 开发模式可以在 PowerShell 中启动：
 
@@ -78,9 +87,9 @@ python -m cloakbrowser install   # 下载 stealth Chromium 二进制
 python -m zencloak
 ```
 
-> 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。单文件 EXE 首次启动需要解压依赖，通常会等待 20 秒左右。
+> 注意：`python -m zencloak` 运行期间不要关闭 PowerShell 窗口，否则应用会退出。
 
-如果觉得单文件 EXE 启动慢，可以按 [docs/packaging.md](docs/packaging.md) 构建 onedir 快速启动版（约 1-2 秒启动）。
+两个安装包的启动速度差别见[下载安装](#下载安装)。若想自行构建安装包（含快速启动的 onedir 版本），见 [docs/packaging.md](docs/packaging.md)。
 
 ## 使用
 
@@ -134,7 +143,7 @@ python -m pytest
 
 **为什么直接打开 `src/zencloak/ui/index.html` 是坏的？**
 
-UI 需要本地 API 才能读取档案。请始终通过 `dist\ZenCloak.exe` 或 `python -m zencloak` 启动；直接打开 HTML 会显示未连接提示。
+UI 需要本地 API 才能读取档案。请始终通过安装后的 ZenCloak 程序或 `python -m zencloak` 启动；直接打开 HTML 会显示未连接提示。
 
 **启动时出现 `Update available: cloakbrowser ...` 是什么？**
 
