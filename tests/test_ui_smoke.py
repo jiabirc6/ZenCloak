@@ -113,8 +113,11 @@ def test_ui_url_opener_sends_normalized_request():
                 assert page.locator("#openUrlInput").is_visible()
                 assert opens, f"open request missing: {recorded}"
                 assert '"url":"https://google.com"' in opens[0][2]
-                page.locator("#openUrlTranslateBtn").click()
-                page.wait_for_timeout(800)
+                # The panel's "translate" button opened translate.google.com in
+                # a new tab. That reloads the document, so page state was lost;
+                # translation is now an in-place action on the loaded page
+                # (Alt+Shift+T / context menu), so the button is gone.
+                assert page.locator("#openUrlTranslateBtn").count() == 0
                 translated = [
                     r
                     for r in recorded
@@ -122,7 +125,7 @@ def test_ui_url_opener_sends_normalized_request():
                     and "/open" in r[1]
                     and "translate.google.com/translate" in r[2]
                 ]
-                assert translated, f"translate request missing: {recorded}"
+                assert not translated, f"不应再有新开页面翻译请求: {translated}"
                 browser.close()
         finally:
             proc.terminate()

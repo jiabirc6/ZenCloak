@@ -106,11 +106,15 @@ class ProfileStore:
         return self._read(profile_id)
 
     def create_profile(self, data: dict) -> dict:
+        # One timestamp for both fields: a freshly created profile has never
+        # been updated, and calling the clock twice produced values that
+        # differed by fractions of a millisecond.
+        now = _now_iso()
         payload = {
             **data,
             "id": uuid.uuid4().hex[:12],
-            "created_at": _now_iso(),
-            "updated_at": _now_iso(),
+            "created_at": now,
+            "updated_at": now,
         }
         profile = Profile.model_validate(payload).model_dump()
         self._write(profile)
