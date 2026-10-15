@@ -25,6 +25,61 @@ const $ = (id) => document.getElementById(id);
 let formDirty = false;
 let cachedApiToken = null;
 
+/**
+ * Appearance.
+ *
+ * Three choices are offered - light, dark, follow the system - but only two
+ * palettes exist, in styles.css under `:root` (dark) and
+ * `:root[data-theme="light"]`. "system" is resolved here rather than in CSS so
+ * the stored preference stays a single value and the resolved theme is always
+ * readable from <html>.
+ */
+const THEME_KEY = "zencloak_theme";
+const THEME_CHOICES = ["light", "dark", "system"];
+
+const prefersDark = () =>
+  window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+function storedTheme() {
+  const raw = localStorage.getItem(THEME_KEY);
+  return THEME_CHOICES.includes(raw) ? raw : "light";
+}
+
+function resolveTheme(choice) {
+  return choice === "system" ? (prefersDark() ? "dark" : "light") : choice;
+}
+
+function markThemeCards(choice) {
+  // Scoped to .theme-card on purpose. The resolved choice is also written to
+  // <html> as data-theme-pref, and a bare [data-theme-choice] selector matched
+  // that element too - which then had "selected" applied to it.
+  document.querySelectorAll(".theme-card[data-theme-choice]").forEach((card) => {
+    const selected = card.dataset.themeChoice === choice;
+    card.classList.toggle("selected", selected);
+    card.setAttribute("aria-checked", selected ? "true" : "false");
+  });
+}
+
+function applyTheme(choice) {
+  const wanted = THEME_CHOICES.includes(choice) ? choice : "light";
+  document.documentElement.dataset.theme = resolveTheme(wanted);
+  document.documentElement.dataset.themePref = wanted;
+  localStorage.setItem(THEME_KEY, wanted);
+  markThemeCards(wanted);
+}
+
+function initTheme() {
+  applyTheme(storedTheme());
+  // Re-resolve when the OS flips, but only while "system" is the choice.
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => {
+    if (storedTheme() === "system") applyTheme("system");
+  };
+  if (media.addEventListener) media.addEventListener("change", onChange);
+  else if (media.addListener) media.addListener(onChange);
+}
+
+
 function waitForPywebview() {
   return new Promise((resolve) => {
     if (!window.pywebview || window.pywebview.api) {
@@ -1155,6 +1210,13 @@ function openBackupModal() {
   $("backupModal").hidden = false;
 }
 
+function openSettingsModal() {
+  // Reflect the stored choice, not the resolved theme, so "system" stays
+  // selected even though <html> carries light or dark.
+  markThemeCards(storedTheme());
+  $("settingsModal").hidden = false;
+}
+
 async function runBackup() {
   const pass = $("backupPass").value;
   if (pass.length < 8) {
@@ -1238,6 +1300,17 @@ function bindEvents() {
   $("batchLaunchBtn").addEventListener("click", batchLaunch);
   $("batchStopBtn").addEventListener("click", batchStop);
   $("recycleBinBtn").addEventListener("click", showRecycleBin);
+  $("settingsBtn").addEventListener("click", openSettingsModal);
+  $("settingsCloseBtn").addEventListener("click", () => {
+    $("settingsModal").hidden = true;
+  });
+  $("settingsModal").addEventListener("click", (event) => {
+    // Click the backdrop (but not the dialog itself) to dismiss.
+    if (event.target === $("settingsModal")) $("settingsModal").hidden = true;
+  });
+  document.querySelectorAll(".theme-card[data-theme-choice]").forEach((card) => {
+    card.addEventListener("click", () => applyTheme(card.dataset.themeChoice));
+  });
   $("quitBtn").addEventListener("click", quitApp);
   $("recycleBackBtn").addEventListener("click", hideRecycleBin);
   $("profileForm").addEventListener("input", markFormDirty);
@@ -1370,6 +1443,7 @@ async function openDownloadDir() {
 }
 
 async function init() {
+  initTheme();
   bindEvents();
   if (window.lucide) window.lucide.createIcons();
   try {

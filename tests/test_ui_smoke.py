@@ -368,3 +368,178 @@ def test_sidebar_list_scrolls_and_keeps_footer_visible():
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
+
+
+@pytest.mark.skipif(not Path(CHROME).exists(), reason="Chrome not available")
+def test_appearance_switches_between_light_and_dark():
+    """The appearance picker drives data-theme, and the themes differ.
+
+    Two palettes live in styles.css: the bare ``:root`` (dark) and
+    ``:root[data-theme="light"]``. The picker stores one of three choices -
+    light, dark, system - and "system" resolves here rather than in CSS, so
+    only the two resolved values ever reach the DOM.
+    """
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT / "src")
+    with tempfile.TemporaryDirectory(prefix="zencloak-theme-") as data_dir:
+        proc = subprocess.Popen(
+            [
+                sys.executable, "-u", "-m", "zencloak",
+                "--headless-ui", "--data-dir", data_dir,
+            ],
+            cwd=str(ROOT), env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        try:
+            url = api_token = None
+            for _ in range(120):
+                line = proc.stdout.readline()
+                if not line:
+                    break
+                match = re.search(r"http://127\.0\.0\.1:\d+", line)
+                if match and url is None:
+                    url = match.group(0)
+                token_match = re.search(r"API token: (\S+)", line)
+                if token_match and api_token is None:
+                    api_token = token_match.group(1)
+                if url and api_token:
+                    break
+            assert url and api_token, "UI server did not start"
+
+            probe = """() => {
+              const g = (sel, prop) => {
+                const el = document.querySelector(sel);
+                return el ? getComputedStyle(el)[prop] : null;
+              };
+              const lum = (rgb) => {
+                const m = /rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/.exec(rgb || '');
+                return m ? (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) : null;
+              };
+              const bodyBg = getComputedStyle(document.body).backgroundColor;
+              const bodyInk = getComputedStyle(document.body).color;
+              return {
+                theme: document.documentElement.dataset.theme,
+                pref: document.documentElement.dataset.themePref,
+                htmlClasses: document.documentElement.className,
+                htmlAttrs: document.documentElement.getAttributeNames(),
+                matched: document.querySelectorAll('[data-theme-choice]').length,
+                cards: document.querySelectorAll('.theme-card').length,
+                selected: [...document.querySelectorAll('.theme-card.selected')]
+                            .map((c) => c.dataset.themeChoice),
+                sidebarBg: g('.sidebar', 'backgroundColor'),
+                sidebarInk: g('.sidebar', 'color'),
+                bodyBg: bodyBg,
+                bodyInk: bodyInk,
+                bodyLum: lum(bodyBg),
+                inkLum: lum(bodyInk),
+                panelBg: g('.profile-form, .panel, .main', 'backgroundColor'),
+                launchBg: g('#launchBtn', 'backgroundColor'),
+                launchInk: g('#launchBtn', 'color'),
+                saveBg: g('#saveBtn', 'backgroundColor'),
+                saveInk: g('#saveBtn', 'color'),
+                openBg: g('#openUrlBtn', 'backgroundColor'),
+                openInk: g('#openUrlBtn', 'color'),
+              };
+            }"""
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch(executable_path=CHROME, headless=True)
+                page = browser.new_page(viewport={"width": 1280, "height": 819})
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.evaluate(
+                    "localStorage.setItem('zencloak_api_token', %s)"
+                    % json.dumps(api_token)
+                )
+                page.reload(wait_until="domcontentloaded")
+                page.wait_for_selector("#profileList .profile-item", timeout=10000)
+
+                # Light is the default for a profile that has never chosen.
+                page.wait_for_timeout(800)
+                state = page.evaluate(probe)
+                assert state["theme"] == "light", state
+                assert state["pref"] == "light", state
+
+                # Regression: the choice is mirrored onto <html> as
+                # data-theme-pref. While it was named data-theme-choice, the
+                # bare [data-theme-choice] selector also matched <html>, which
+                # then had "selected" and aria-checked applied to it.
+                assert "theme-choice" not in state["htmlAttrs"], state
+                assert "selected" not in state["htmlClasses"], state
+                assert state["matched"] == state["cards"] == 3, state
+                assert state["selected"] == ["light"], state
+
+                # Switching through the picker changes the palette.
+                page.locator("#settingsBtn").click()
+                page.wait_for_timeout(300)
+                page.locator(".theme-card[data-theme-choice='dark']").click()
+                page.wait_for_timeout(500)
+                dark = page.evaluate(probe)
+                assert dark["theme"] == "dark", dark
+                assert dark["pref"] == "dark", dark
+                assert dark["selected"] == ["dark"], dark
+                assert dark["sidebarBg"] != state["sidebarBg"], (
+                    f"侧栏底色没变: {state['sidebarBg']} -> {dark['sidebarBg']}"
+                )
+                assert dark["sidebarInk"] != state["sidebarInk"], (
+                    f"侧栏文字色没变: {state['sidebarInk']} -> {dark['sidebarInk']}"
+                )
+
+                # Dark must reach the whole window, not just the rail. The
+                # first cut of this feature only swapped the sidebar, which
+                # left a bright panel beside a dark rail - reported as
+                # "选择深色的时候右边不能也变成深色的吗".
+                assert dark["bodyLum"] < 60, (
+                    f"深色主题主区不够暗: {dark['bodyBg']} (lum={dark['bodyLum']})"
+                )
+                assert dark["bodyLum"] < state["bodyLum"], (
+                    f"深色主区没有变暗: {state['bodyBg']} -> {dark['bodyBg']}"
+                )
+                assert dark["inkLum"] > 150, (
+                    f"深色主题正文不够亮: {dark['bodyInk']}"
+                )
+                assert state["inkLum"] < 120, (
+                    f"浅色主题正文不够深: {state['bodyInk']}"
+                )
+
+                # The toolbar buttons follow too. Both primaries carry a tinted
+                # fill rather than a solid accent block, and the "save" button
+                # is an outline rather than solid black.
+                for name in ("launchBg", "openBg", "saveBg", "launchInk", "saveInk"):
+                    assert dark[name] != state[name], (
+                        f"{name} 没跟着主题变: {state[name]} -> {dark[name]}"
+                    )
+                for name in ("launchBg", "openBg"):
+                    assert state[name] != "rgba(0, 0, 0, 0)", (
+                        f"浅色 {name} 应该是淡色填充而不是透明"
+                    )
+                # save is an outline: transparent fill on light.
+                assert state["saveBg"] == "rgba(0, 0, 0, 0)", (
+                    f"浅色保存按钮应为描边式: {state['saveBg']}"
+                )
+
+                # The choice survives a reload, and no wrong-theme flash: the
+                # inline head script resolves it before app.js runs.
+                page.reload(wait_until="domcontentloaded")
+                page.wait_for_timeout(800)
+                again = page.evaluate(probe)
+                assert again["theme"] == "dark", again
+                assert again["pref"] == "dark", again
+
+                # "system" resolves to one of the two palettes and remembers
+                # that "system" was the choice.
+                page.locator("#settingsBtn").click()
+                page.wait_for_timeout(300)
+                page.locator(".theme-card[data-theme-choice='system']").click()
+                page.wait_for_timeout(500)
+                system = page.evaluate(probe)
+                assert system["pref"] == "system", system
+                assert system["theme"] in {"light", "dark"}, system
+                assert system["selected"] == ["system"], system
+                browser.close()
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()

@@ -1,32 +1,159 @@
+/* ===== Themes =====================================================
+   Light is the default and lives in the bare :root. Dark overrides it
+   under [data-theme="dark"]; app.js writes that attribute before the
+   first paint, so there is no flash of the wrong palette.
+
+   Every colour the UI paints comes from this list. Anything hardcoded in
+   a rule below cannot follow the theme, which is how a light sidebar once
+   ended up with white-on-white buttons.
+   ================================================================== */
+
 :root {
-  --bg: #edf0ea;
-  --panel: #fcfcf9;
-  --ink: #212a26;
-  --muted: #6d7771;
-  --faint: #98a09a;
-  --line: #e2e5dd;
-  --line-strong: #cbd0c6;
-  --field: #f1f3ec;
-  --accent: #0e7a6d;
-  --accent-strong: #0b6359;
-  --accent-soft: #d9efe8;
-  --accent-ring: rgba(14, 122, 109, 0.16);
-  --success: #1a7a4e;
-  --success-soft: #ddf0e4;
+  /* Neutrals, from the reference: near-white ground, a hair of grey for
+     rails and hovers, near-black ink, deep teal accent. */
+  --bg: #f5f5f5;
+  --panel: #ffffff;
+  --ink: #060606;
+  --muted: #6c6c6c;
+  --faint: #9a9a9a;
+  --line: #ebebeb;
+  --line-strong: #dcdcdc;
+  --field: #f5f5f5;
+  --accent: #138271;
+  --accent-strong: #0f6a5c;
+  --accent-soft: #e3f1ee;
+  --accent-ring: rgba(19, 130, 113, 0.16);
+  --success: #138271;
+  --success-soft: #e3f1ee;
   --amber: #8a6109;
-  --amber-soft: #f6ebd2;
-  --danger: #b3261e;
-  --danger-soft: #fbe4e0;
+  --amber-soft: #f8eed8;
+  --danger: #c0392b;
+  --danger-soft: #fbeae8;
+
+  /* Sidebar: a light rail against white content, so controls are
+     expressed as white cards with dark-alpha edges. */
+  --sidebar: #f5f5f5;
+  --sd-ink: #1a1a1a;
+  --sd-muted: #7a7a7a;
+  --sd-line: rgba(0, 0, 0, 0.08);
+  --sd-hover: rgba(0, 0, 0, 0.04);
+  --sd-active: #e6e6e6;
+  --sd-btn: #ffffff;
+  --sd-btn-hover: #f0f0f0;
+  --sd-btn-hover-line: rgba(0, 0, 0, 0.14);
+  --sd-on-accent: #fff;
+  --sd-scroll: rgba(0, 0, 0, 0.16);
+  --sd-scroll-hover: rgba(0, 0, 0, 0.28);
+  --sd-dot-idle: #b8b8b8;
+  --sd-dot-running: #2bb673;
+  --sd-dot-stopping: #e2a03f;
+  --sd-dot-error: #f0655c;
+
+  /* Main panel. */
+  --surface: #fff;
+  --surface-hover: #f0f0f0;
+  --badge-idle-bg: #efefef;
+  --badge-idle-ink: #6c6c6c;
+
+  /* Primary buttons carry a tinted fill rather than a solid block, and the
+     secondary "dark" button is an outline - both so the toolbar stays light
+     against a light panel. */
+  --btn-primary-bg: #e3f1ee;
+  --btn-primary-ink: #0f6a5c;
+  --btn-primary-line: #bfe0d9;
+  --btn-primary-hover-bg: #d3e9e4;
+  --btn-dark-bg: transparent;
+  --btn-dark-ink: #2b2b2b;
+  --btn-dark-line: #d4d4d4;
+  --btn-dark-hover-bg: #ececec;
+
+  --toast-bg: #1a1a1a;
+  --toast-ink: #fff;
+  --backdrop: rgba(0, 0, 0, 0.35);
+  --brand-mark-to: #17a58f;
+  --brand-mark-ring: rgba(19, 130, 113, 0.28);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 28px rgba(0, 0, 0, 0.05);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.14);
+  --toast-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  --dot-ring: 0 0 0 3px;
+  --radius: 10px;
+  --radius-sm: 8px;
+}
+
+/* Dark: the whole window goes dark, not just the rail. The sidebar keeps the
+   original deep green; the panel gets its own dark ground and the tokens that
+   were written for a light panel are restated. */
+:root[data-theme="dark"] {
+  --bg: #141a18;
+  --panel: #1b211f;
+  --ink: #e8efeb;
+  --muted: #9aa8a2;
+  --faint: #6f7d78;
+  --line: #2a3230;
+  --line-strong: #39423f;
+  --field: #222927;
+  --accent: #1a9c87;
+  --accent-strong: #23b39c;
+  --accent-soft: #1d3a35;
+  --accent-ring: rgba(26, 156, 135, 0.24);
+  --success: #35b98a;
+  --success-soft: #1c3630;
+  --amber: #d8a24a;
+  --amber-soft: #33291a;
+  --danger: #e8695e;
+  --danger-soft: #3a221f;
+
   --sidebar: #10241e;
   --sd-ink: #e8efeb;
   --sd-muted: #93a8a0;
   --sd-line: rgba(255, 255, 255, 0.09);
   --sd-hover: rgba(255, 255, 255, 0.06);
   --sd-active: rgba(255, 255, 255, 0.11);
-  --radius: 10px;
-  --radius-sm: 8px;
-  --shadow: 0 1px 2px rgba(18, 32, 27, 0.06), 0 12px 28px rgba(18, 32, 27, 0.06);
-  --shadow-pop: 0 8px 28px rgba(18, 32, 27, 0.16);
+  --sd-btn: rgba(255, 255, 255, 0.05);
+  --sd-btn-hover: rgba(255, 255, 255, 0.12);
+  --sd-btn-hover-line: rgba(255, 255, 255, 0.18);
+  --sd-on-accent: #fff;
+  --sd-scroll: rgba(255, 255, 255, 0.16);
+  --sd-scroll-hover: rgba(255, 255, 255, 0.28);
+  --sd-dot-idle: #4c5a55;
+  --sd-dot-running: #46cf8b;
+  --sd-dot-stopping: #e2a03f;
+  --sd-dot-error: #f0655c;
+
+  --surface: #232b28;
+  --surface-hover: #2b3330;
+  --badge-idle-bg: #2a3230;
+  --badge-idle-ink: #9aa8a2;
+
+  /* On a dark panel the tinted fill still reads, but the ink has to lighten
+     and the outline has to lift off the ground. */
+  --btn-primary-bg: #1d4a43;
+  --btn-primary-ink: #7fd8c6;
+  --btn-primary-line: #2c655b;
+  --btn-primary-hover-bg: #23574e;
+  --btn-dark-bg: #2b3330;
+  --btn-dark-ink: #e8efeb;
+  --btn-dark-line: #3d4643;
+  --btn-dark-hover-bg: #343d3a;
+
+  --toast-bg: #2b3330;
+  --toast-ink: #e8efeb;
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --brand-mark-to: #17a58f;
+  --brand-mark-ring: rgba(0, 0, 0, 0.35);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px rgba(0, 0, 0, 0.28);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --toast-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* The sidebar in the reference is a flat light rail: the outlined "buttons"
+   read as raised white cards, so keep the border but drop the fill weight. */
+:root[data-theme="light"] .sidebar .btn {
+  border-color: var(--sd-line);
+}
+
+:root[data-theme="light"] .brand-mark {
+  box-shadow: 0 2px 8px var(--brand-mark-ring);
 }
 
 * {
@@ -91,11 +218,11 @@ textarea {
   width: 38px;
   height: 38px;
   border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--accent), #17a58f);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--brand-mark-to));
+  color: var(--sd-on-accent);
   font-size: 19px;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(14, 122, 109, 0.3);
+  box-shadow: 0 2px 8px var(--brand-mark-ring);
 }
 
 .brand-text {
@@ -117,21 +244,21 @@ textarea {
 }
 
 .sidebar .btn {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sd-btn);
   border: 1px solid var(--sd-line);
   border-radius: var(--radius-sm);
   color: var(--sd-ink);
 }
 
 .sidebar .btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--sd-btn-hover);
+  border-color: var(--sd-btn-hover-line);
 }
 
 .sidebar .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--sd-on-accent);
 }
 
 .sidebar .btn.primary:hover:not(:disabled) {
@@ -140,7 +267,7 @@ textarea {
 }
 
 .sidebar .btn.primary svg {
-  color: #fff;
+  color: var(--sd-on-accent);
 }
 
 .sidebar-actions {
@@ -177,12 +304,12 @@ textarea {
 }
 
 .profile-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--sd-scroll);
   border-radius: 999px;
 }
 
 .profile-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--sd-scroll-hover);
 }
 
 .profile-list::-webkit-scrollbar-track {
@@ -247,27 +374,27 @@ textarea {
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #4c5a55;
+  background: var(--sd-dot-idle);
 }
 
 .pstatus.running {
-  background: #46cf8b;
-  box-shadow: 0 0 0 3px rgba(70, 207, 139, 0.25);
+  background: var(--sd-dot-running);
+  box-shadow: var(--dot-ring) rgba(70, 207, 139, 0.25);
 }
 
 .pstatus.launching,
 .pstatus.stopping {
-  background: #e2a03f;
-  box-shadow: 0 0 0 3px rgba(226, 160, 63, 0.25);
+  background: var(--sd-dot-stopping);
+  box-shadow: var(--dot-ring) rgba(226, 160, 63, 0.25);
 }
 
 .pstatus.error {
-  background: #f0655c;
-  box-shadow: 0 0 0 3px rgba(240, 101, 92, 0.25);
+  background: var(--sd-dot-error);
+  box-shadow: var(--dot-ring) rgba(240, 101, 92, 0.25);
 }
 
 .pstatus.stopped {
-  background: #4c5a55;
+  background: var(--sd-dot-idle);
 }
 
 /* ===== Sidebar foot ===== */
@@ -298,16 +425,16 @@ textarea {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #4c5a55;
+  background: var(--sd-dot-idle);
   flex: none;
 }
 
 .dot.ok {
-  background: #46cf8b;
+  background: var(--sd-dot-running);
 }
 
 .dot.bad {
-  background: #f0655c;
+  background: var(--sd-dot-error);
 }
 
 /* ===== Main area ===== */
@@ -378,8 +505,8 @@ textarea {
 }
 
 .badge.stopped {
-  background: #eceae2;
-  color: #6f6a5e;
+  background: var(--badge-idle-bg);
+  color: var(--badge-idle-ink);
 }
 
 .badge.error {
@@ -433,25 +560,26 @@ textarea {
 }
 
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-line);
+  color: var(--btn-primary-ink);
 }
 
 .btn.primary:hover:not(:disabled) {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  background: var(--btn-primary-hover-bg);
+  border-color: var(--btn-primary-line);
 }
 
 .btn.dark {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #fff;
+  background: var(--btn-dark-bg);
+  border-color: var(--btn-dark-line);
+  color: var(--btn-dark-ink);
 }
 
 .btn.dark:hover:not(:disabled) {
-  background: #121a17;
-  border-color: #121a17;
+  background: var(--btn-dark-hover-bg);
+  border-color: var(--btn-dark-line);
+  color: var(--btn-dark-ink);
 }
 
 .btn.icon {
@@ -489,7 +617,7 @@ textarea {
   z-index: 45;
   min-width: 200px;
   padding: 6px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-pop);
@@ -636,7 +764,7 @@ textarea {
 .field select:hover,
 .field textarea:hover {
   border-color: var(--line-strong);
-  background: #ede9e0;
+  background: var(--surface-hover);
 }
 
 .field input:focus,
@@ -644,7 +772,7 @@ textarea {
 .field textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
-  background: #fff;
+  background: var(--surface);
 }
 
 .field input[type="checkbox"] {
@@ -740,7 +868,7 @@ textarea {
 
 .node-trigger:hover:not(:disabled) {
   border-color: var(--line-strong);
-  background: #ede9e0;
+  background: var(--surface-hover);
 }
 
 .node-trigger:disabled {
@@ -767,7 +895,7 @@ textarea {
   z-index: 40;
   max-height: 280px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-pop);
@@ -956,20 +1084,20 @@ textarea {
 
 #openUrlInput:hover {
   border-color: var(--line-strong);
-  background: #ede9e0;
+  background: var(--surface-hover);
 }
 
 #openUrlInput:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
-  background: #fff;
+  background: var(--surface);
 }
 
 /* ===== Modal ===== */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(18, 32, 27, 0.45);
+  background: var(--backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1018,6 +1146,66 @@ textarea {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 4px;
+}
+
+/* ===== Settings: appearance picker ===== */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.theme-card svg {
+  width: 18px;
+  height: 18px;
+}
+
+.theme-card:hover {
+  background: var(--surface-hover);
+}
+
+/* The chosen card reads as pressed: a soft accent wash and an accent frame,
+   matching the reference's selected-state treatment. */
+.theme-card.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.theme-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 .health-summary {
@@ -1127,10 +1315,10 @@ textarea {
   max-width: 340px;
   padding: 11px 16px;
   border-radius: var(--radius);
-  background: #231f19;
-  color: #fff;
+  background: var(--toast-bg);
+  color: var(--toast-ink);
   font-size: 13px;
-  box-shadow: 0 12px 32px rgba(18, 32, 27, 0.28);
+  box-shadow: var(--toast-shadow);
   opacity: 0;
   pointer-events: none;
   transform: translateY(8px);

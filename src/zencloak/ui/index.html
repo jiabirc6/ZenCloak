@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ZenCloak</title>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    // Set the theme before the first paint. app.js does the same on init, but
+    // it is deferred, so without this the default (dark) palette would flash
+    // briefly for anyone on the light theme.
+    (function () {
+      try {
+        var choice = localStorage.getItem("zencloak_theme") || "light";
+        var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var resolved = choice === "system" ? (dark ? "dark" : "light") : choice;
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.dataset.themePref = choice;
+      } catch (e) {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  </script>
   <script src="vendor/lucide.min.js" defer></script>
   <script src="app.js" defer></script>
   <script src="file-mode.js" defer></script>
@@ -39,6 +55,9 @@
         </button>
         <button id="recycleBinBtn" class="btn foot-btn" type="button">
           <i data-lucide="trash-2"></i>回收站
+        </button>
+        <button id="settingsBtn" class="btn foot-btn" type="button" title="外观与偏好设置">
+          <i data-lucide="settings"></i>设置
         </button>
         <button id="quitBtn" class="btn foot-btn" type="button">
           <i data-lucide="power"></i>退出
@@ -500,6 +519,35 @@
         <div class="modal-actions">
           <button id="restoreRunBtn" class="btn primary" type="button"><i data-lucide="archive-restore"></i>开始恢复</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>设置</h2>
+        <button id="settingsCloseBtn" class="btn" type="button"><i data-lucide="x"></i>关闭</button>
+      </div>
+      <div class="modal-body">
+        <section class="settings-section">
+          <h3 class="settings-title">外观</h3>
+          <div class="theme-picker" role="radiogroup" aria-label="外观">
+            <button class="theme-card" type="button" data-theme-choice="light" role="radio" aria-checked="false">
+              <i data-lucide="sun"></i>
+              <span>浅色</span>
+            </button>
+            <button class="theme-card" type="button" data-theme-choice="dark" role="radio" aria-checked="false">
+              <i data-lucide="moon"></i>
+              <span>深色</span>
+            </button>
+            <button class="theme-card" type="button" data-theme-choice="system" role="radio" aria-checked="false">
+              <i data-lucide="monitor"></i>
+              <span>跟随系统</span>
+            </button>
+          </div>
+          <p class="modal-hint">跟随系统时会随 Windows 的浅色 / 深色设置自动切换。</p>
+        </section>
       </div>
     </div>
   </div>
