@@ -134,25 +134,52 @@ REMEDIATION 第 85 行的验收标准（「有 → 抽象 keyring 后端」）�
 - 旧版 `pythonw -m zencloak` 和测试残留的 `ZenCloak.exe` 会占用单实例锁，导致新启动弹「已在运行」。处理方式：任务管理器结束所有 `ZenCloak` / `pythonw` 进程。
 - PyInstaller onefile 被强制结束后可能残留子进程，同样会占锁。
 
-#### 「点退出没反应」的死锁（2026-10-15 实测）
+#### 「点退出没反应」的挂起（2026-10-15 观察到，根因未确定）
 
-**现象**：开发版点了退出没反应；同时 `pythonw.exe -m zencloak` 的 `Responding=False`（窗口消息循环已死）。
+> ⚠️ **先读这段**：本小节的**根因尚未查明**。此前有一个版本在这里写了一个
+> 看起来很合理的根因，后来被实验推翻，已删除。**不要照着猜测去改
+> `shutdown.py`** —— 实测证明那条路径是正常的。详见下方「已排除的假设」。
 
-**实测证据链**：
+**观察到的事实**（2026-10-15，一个跑了约 17 小时的开发版实例）：
 
 ```
-POST /api/shutdown   → 0.1s 返回 {"ok":true}
-/api/profiles        → 0.01s 正常
-/api/sessions        → 挂死，>30s 无响应   ← 关键区别
-30 秒后进程仍存活，mihomo 子进程仍存活
+进程状态
+  pythonw.exe -m zencloak，PID 23312，启动于 2026-10-14 17:10:28
+  Responding = False          <- Win32 消息循环没在泵消息
+  33 线程 / 1534 句柄 / CPU 1331s（30 秒内只涨 0.5s，不是在自旋）
+
+接口响应
+  GET  /api/profiles    → 0.01s 正常
+  GET  /api/sessions    → 挂死，>30s 无响应
+  POST /api/shutdown    → 0.1s 返回 {"ok":true}，但进程 30s 后仍存活
+
+退出后
+  cloakbrowser 的 chrome 子进程随之消失，mihomo 成为孤儿（父进程已死）
 ```
 
-**根因**：会话线程卡在 `_run_session` 的循环里（`sessions.py` L228-242，
-每 0.3s 调一次 `context.browser.is_connected()`），某个 Playwright 调用永不返回。
-于是 `stop_all()` 里 `thread.join(timeout=5)` 收不掉线程，
-`spawn_hard_exit` 的守护线程也走不到 `os._exit(0)` —— **清理路径自己也被堵住了**。
+**未确定的部分**：`/api/sessions` 为何会挂、`os._exit(0)` 为何没有执行到，
+**都不清楚**。当时没有抓线程栈，进程已被强制结束，**证据已丢失**。
 
-**处置顺序**（先杀宿主，再收孤儿）：
+**已排除的假设**（2026-10-15 用对照实验推翻，勿重复推测）：
+
+| 假设 | 实验结果 | 结论 |
+|---|---|---|
+| 会话线程卡住 → `stop_all` 的 `join` 堵死清理路径 | 干净实例 POST `/api/shutdown` **0.6s 退出 code=0**；带活跃浏览器会话 **0.5s 退出 code=0** | ❌ 排除 |
+| `SessionManager.status()` 会阻塞 | 真实 `SessionManager` + 卡死线程，`status()` **0.000s 返回** | ❌ 排除 |
+| `stop_all(wait=True)` 会永久挂起 | 5.01s 返回（超时上限），不会永久挂起 | ❌ 排除 |
+| 有锁被跨阻塞调用持有 | 静态扫描 `sessions.py` 全部 `with self._lock` 块，**锁内零个阻塞调用** | ❌ 排除 |
+
+关键点：`/api/shutdown` 走 `spawn_hard_exit` → `stop_everything(wait=False)`，
+**不等待会话线程**，所以它不可能被会话线程堵住。
+
+**下次复现时要做的**（这才是能定性的手段）：
+
+```powershell
+pip install py-spy
+py-spy dump --pid <PID>        # 抓全部线程栈，这是唯一能给出直接证据的手段
+```
+
+**应急处置顺序**（先杀宿主，再收孤儿）——**这是已验证有效的手法，不是根因**：
 
 ```powershell
 Stop-Process -Id <pythonw的PID> -Force    # 1. 先杀 ZenCloak 宿主
@@ -163,8 +190,11 @@ Stop-Process -Id <mihomo的PID> -Force     # 2. 再杀 mihomo 孤儿（父进程
 **验证干净的标志**：`zencloak.lock` 可读（未被占用）、无 `mihomo` 进程、
 无 `cloakbrowser` 路径下的 `chrome.exe`、无 `pythonw -m zencloak`。
 
-> 注：这就是 R12 想解决的问题（mihomo 残留）。R12 的修复覆盖了正常退出路径，
-> 但**会话线程自身死锁**时仍然会漏 —— 这属于新的、尚未修的问题。
+> **给下一任会话的提醒**：这里曾经有过一次误判 —— 凭 `sessions.py` 里
+> `thread.join(timeout=5)` 的存在，就推断"清理路径被堵死"，且未做任何验证
+> 就写进了本文档。后来一跑实验就推翻了。
+> 教训：**报根因前必须能指出验证它的那条命令**；指不出来，就只能报
+> 「观察到 X」，不能报「因为 Y」。
 
 ### PyInstaller
 
