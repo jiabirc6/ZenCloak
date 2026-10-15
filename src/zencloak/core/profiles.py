@@ -3,6 +3,9 @@ import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+
+from pydantic_core import PydanticUndefined
 
 from .fingerprint import default_profile_draft
 from .identifiers import require_id, resolve_within
@@ -12,6 +15,23 @@ from .secrets import decrypt_text, encrypt_text
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _model_defaults() -> dict[str, Any]:
+    """Fields that have a default, taken from the model itself.
+
+    Derived rather than hand-listed so a field added to ``Profile`` cannot be
+    forgotten here - the two would otherwise drift and the omission would only
+    show up as a missing key in the API for profiles nobody had edited yet.
+    """
+    return {
+        name: field.default_factory if field.default_factory is not None else field.default
+        for name, field in Profile.model_fields.items()
+        if field.default_factory is not None or field.default is not PydanticUndefined
+    }
+
+
+_MODEL_DEFAULTS = _model_defaults()
 
 
 def _serialize_profile(profile: dict) -> dict:
@@ -31,6 +51,13 @@ def _deserialize_profile(data: dict) -> dict:
         except Exception:
             password = proxy["password"]
         profile["proxy"] = {**proxy, "password": password}
+    # Fill in fields the model defaults but this file predates. Profiles are
+    # read straight from JSON rather than re-validated, so a field added to
+    # Profile later is simply absent from every existing file - it showed up
+    # only after a profile had been saved once, which made the API's shape
+    # depend on whether a profile had been edited.
+    for field, default in _MODEL_DEFAULTS.items():
+        profile.setdefault(field, default() if callable(default) else default)
     return profile
 
 

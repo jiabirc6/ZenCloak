@@ -11,6 +11,7 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
     "cloakbrowser>=0.2,<0.4",
+    "cryptography>=42",
     "fastapi>=0.141",
     "httpx>=0.28",
     "mcp>=1.2",

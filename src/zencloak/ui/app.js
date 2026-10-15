@@ -18,6 +18,10 @@ const state = {
   selectedColor: PALETTE[0],
   engine: { available: false, version: null },
   selectedIds: new Set(),
+  // Sidebar filtering. Kept in state so a re-render (a status tick, a save)
+  // does not silently drop what the user typed or which tags they picked.
+  search: "",
+  activeTags: new Set(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -208,6 +212,7 @@ async function loadProfiles() {
   if (!state.selectedId || !state.profiles.some((p) => p.id === state.selectedId)) {
     state.selectedId = state.profiles[0] ? state.profiles[0].id : null;
   }
+  renderTagFilter();
   renderProfileList();
   renderForm();
 }
@@ -215,16 +220,28 @@ async function loadProfiles() {
 function renderProfileList() {
   const list = $("profileList");
   list.innerHTML = "";
-  for (const profile of state.profiles) {
+  const visible = visibleProfiles();
+  if (!visible.length && state.profiles.length) {
+    const empty = document.createElement("p");
+    empty.className = "list-empty";
+    empty.textContent = "没有匹配的档案";
+    list.appendChild(empty);
+  }
+  for (const profile of visible) {
     const item = document.createElement("button");
     item.className = "profile-item" + (profile.id === state.selectedId ? " active" : "");
     item.type = "button";
     item.dataset.profileId = profile.id;
     const status = statusOf(profile.id);
+    const tags = (profile.tags || [])
+      .map((tag) => `<span class="ptag">${escapeHtml(tag)}</span>`)
+      .join("");
     item.innerHTML = `
       <input type="checkbox" class="profile-check" data-profile-id="${profile.id}" aria-label="选择档案">
       <span class="pcolor" style="background:${profile.color}"></span>
-      <span class="pname">${escapeHtml(profile.name)}<small>指纹 ${profile.seed}</small></span>
+      <span class="pname">${escapeHtml(profile.name)}<small>指纹 ${profile.seed}</small>${
+        tags ? `<span class="ptags">${tags}</span>` : ""
+      }</span>
       <span class="pstatus ${status.status}"></span>
     `;
     const check = item.querySelector(".profile-check");
@@ -244,6 +261,69 @@ function renderProfileList() {
   $("profileTitle").textContent = state.selectedId
     ? state.profiles.find((p) => p.id === state.selectedId)?.name || "未选择档案"
     : "未选择档案";
+}
+
+/**
+ * Profiles matching the current search text and tag selection.
+ *
+ * Filtering happens on the client: the whole list is already loaded, and
+ * round-tripping each keystroke to the server would add a request for every
+ * character typed without changing the result.
+ */
+function visibleProfiles() {
+  const needle = (state.search || "").trim().toLowerCase();
+  const tags = state.activeTags || new Set();
+  return state.profiles.filter((profile) => {
+    if (tags.size) {
+      const own = new Set((profile.tags || []).map((t) => t.toLowerCase()));
+      for (const wanted of tags) {
+        if (!own.has(wanted)) return false;
+      }
+    }
+    if (!needle) return true;
+    const haystack = [
+      profile.name,
+      profile.notes,
+      String(profile.seed),
+      ...(profile.tags || []),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+
+/** Every tag in use, so the filter bar can offer them without a tag registry. */
+function allTags() {
+  const seen = new Map();
+  for (const profile of state.profiles) {
+    for (const tag of profile.tags || []) {
+      const key = tag.toLowerCase();
+      if (!seen.has(key)) seen.set(key, tag);
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "zh"));
+}
+
+function renderTagFilter() {
+  const bar = $("tagFilter");
+  const tags = allTags();
+  bar.innerHTML = "";
+  bar.hidden = tags.length === 0;
+  for (const tag of tags) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "tag-chip" + (state.activeTags.has(tag.toLowerCase()) ? " active" : "");
+    chip.textContent = tag;
+    chip.addEventListener("click", () => {
+      const key = tag.toLowerCase();
+      if (state.activeTags.has(key)) state.activeTags.delete(key);
+      else state.activeTags.add(key);
+      renderTagFilter();
+      renderProfileList();
+    });
+    bar.appendChild(chip);
+  }
 }
 
 function updateBatchButtons() {
@@ -268,6 +348,14 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+/** Split the tag input into a clean list. Accepts commas or full-width commas. */
+function parseTagInput(value) {
+  return String(value || "")
+    .split(/[,，]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function selectProfile(id) {
@@ -306,6 +394,7 @@ function renderForm() {
   $("name").value = profile.name || "";
   $("startUrl").value = profile.start_url || "";
   $("notes").value = profile.notes || "";
+  $("tags").value = (profile.tags || []).join(", ");
   $("kernel").value = profile.kernel || "cloak";
   $("seed").value = profile.seed;
   $("timezone").value = profile.timezone;
@@ -315,6 +404,7 @@ function renderForm() {
   $("deviceMemory").value = String(profile.device_memory);
   $("userAgent").value = profile.user_agent || "";
   $("humanize").checked = Boolean(profile.humanize);
+  $("autoTimezone").checked = Boolean(profile.auto_timezone);
   $("humanPreset").value = profile.human_preset || "default";
   $("translateButton").checked = Boolean(profile.translate_button);
   $("cdpAttach").checked = Boolean(profile.cdp_attach);
@@ -787,6 +877,7 @@ async function applyIpTimezone() {
     const updated = result.profile;
     const index = state.profiles.findIndex((p) => p.id === updated.id);
     if (index >= 0) state.profiles[index] = updated;
+    renderTagFilter();
     renderProfileList();
     renderForm();
     toast(`时区已改为 ${result.timezone}`);
@@ -798,6 +889,64 @@ async function applyIpTimezone() {
   }
 }
 
+async function exportCookies() {
+  if (!state.selectedId) return;
+  try {
+    // Offer both formats in one go: the format is only known once the file
+    // lands in whatever tool the user has, and asking first is a needless
+    // extra decision.
+    const data = await api(`/api/profiles/${state.selectedId}/cookies?fmt=netscape`);
+    if (!data.count) {
+      toast("该档案还没有 Cookie", true);
+      return;
+    }
+    const name = safeFileName(
+      state.profiles.find((p) => p.id === state.selectedId)?.name || "profile"
+    );
+    for (const [fmt, suffix, type, content] of [
+      ["netscape", "cookies.txt", "text/plain", data.content],
+      ["json", "cookies.json", "application/json", null],
+    ]) {
+      let body = content;
+      if (body === null) {
+        const other = await api(`/api/profiles/${state.selectedId}/cookies?fmt=json`);
+        body = other.content;
+      }
+      const blob = new Blob([body], { type });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `zencloak-${name}-${suffix}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    }
+    toast(
+      data.undecrypted
+        ? `已导出 ${data.count} 条 Cookie（${data.undecrypted} 条无法解密）`
+        : `已导出 ${data.count} 条 Cookie`
+    );
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function importCookiesFromFile(file) {
+  if (!file || !state.selectedId) return;
+  try {
+    const content = await file.text();
+    const result = await api(`/api/profiles/${state.selectedId}/cookies`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    toast(`已导入 ${result.imported} 条 Cookie`);
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    $("cookieFile").value = "";
+  }
+}
+
 function readForm() {
   const screen = $("screen").value.split("x").map(Number);
   const proxyEnabled = $("proxyEnabled").checked;
@@ -806,6 +955,7 @@ function readForm() {
     name: $("name").value.trim() || "未命名档案",
     color: state.selectedColor,
     notes: $("notes").value,
+    tags: parseTagInput($("tags").value),
     kernel: $("kernel").value,
     seed: Number($("seed").value),
     timezone: $("timezone").value,
@@ -831,6 +981,7 @@ function readForm() {
         }
       : null,
     humanize: $("humanize").checked,
+    auto_timezone: $("autoTimezone").checked,
     human_preset: $("humanPreset").value,
     translate_button: $("translateButton").checked,
     cdp_attach: $("cdpAttach").checked,
@@ -869,6 +1020,7 @@ async function saveProfile() {
     });
     const index = state.profiles.findIndex((p) => p.id === updated.id);
     if (index >= 0) state.profiles[index] = updated;
+    renderTagFilter();
     renderProfileList();
     renderForm();
     formDirty = false;
@@ -1297,6 +1449,15 @@ function bindEvents() {
   $("downloadsBtn").addEventListener("click", openDownloadsFolder);
   $("importProfileBtn").addEventListener("click", pickImportFile);
   $("importFile").addEventListener("change", importProfileFromFile);
+  $("profileSearch").addEventListener("input", (event) => {
+    state.search = event.target.value;
+    renderProfileList();
+  });
+  $("exportCookiesBtn").addEventListener("click", exportCookies);
+  $("importCookiesBtn").addEventListener("click", () => $("cookieFile").click());
+  $("cookieFile").addEventListener("change", (event) => {
+    importCookiesFromFile(event.target.files && event.target.files[0]);
+  });
   $("batchLaunchBtn").addEventListener("click", batchLaunch);
   $("batchStopBtn").addEventListener("click", batchStop);
   $("recycleBinBtn").addEventListener("click", showRecycleBin);

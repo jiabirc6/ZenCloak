@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import cloakbrowser.browser as _cloakbrowser_browser
 from cloakbrowser import launch_persistent_context
 
+from .consistency import lookup_ip_geo
 from .downloads import attach_download_handler
 from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
 from .health import PROBE_JS
@@ -192,6 +193,10 @@ class SessionManager:
     def _run_session(self, profile: dict, session: dict[str, Any]) -> None:
         try:
             proxy_server = self._start_proxy(profile)
+            # Resolved after the proxy exists so the lookup exits the same way
+            # the browser will, and before the launch kwargs are built so the
+            # session picks up the timezone rather than the stored one.
+            profile = self._resolve_auto_timezone(profile, proxy_server)
             cdp_port = allocate_ports(1)[0] if profile.get("cdp_attach") else None
             with self._lock:
                 session["cdp_port"] = cdp_port
@@ -346,6 +351,18 @@ class SessionManager:
             "cdp_endpoint": f"http://127.0.0.1:{port}" if port else None,
         }
 
+    def profile_dir(self, profile_id: str) -> Path:
+        """Resolve a profile's data directory by ID, rejecting traversal.
+
+        The public counterpart to :meth:`_profile_dir`, for callers outside the
+        session manager that need to read per-profile browser files - the
+        cookie importer, for one. Going through ``_profile_dir`` from the API
+        would have worked but reached past the ID validation this class exists
+        to enforce, which is precisely the gap that was closed when paths
+        started being built from user-supplied IDs.
+        """
+        return self._resolve_profile_path(profile_id)
+
     def _profile_dir(self, profile: dict) -> Path:
         """Resolve a profile's data directory, rejecting traversal IDs.
 
@@ -427,6 +444,51 @@ class SessionManager:
             # system proxy; profiles with no built-in proxy must go direct.
             args.append("--no-proxy-server")
         return kwargs
+
+    def _resolve_auto_timezone(self, profile: dict, proxy_server: str | None) -> dict:
+        """Adopt the egress timezone for this session when the profile asks.
+
+        The consistency check already told users their profile timezone did not
+        match the IP they were exiting from; this is the same lookup applied
+        automatically so the fix does not have to be clicked through on every
+        launch.
+
+        Deliberately best-effort. A failed lookup - no network, a proxy that
+        refuses the request - must not stop a profile from launching, so the
+        stored timezone is kept and the session starts anyway. The mismatch is
+        left for the health report to flag, which is where it was visible
+        before this option existed.
+        """
+        if not profile.get("auto_timezone"):
+            return profile
+        proxy_url = proxy_server or self._manual_proxy_url(profile)
+        try:
+            geo = lookup_ip_geo(proxy_url)
+        except Exception:  # noqa: BLE001 - never block a launch on a geo lookup
+            return profile
+        egress_timezone = (geo or {}).get("timezone")
+        if not egress_timezone or egress_timezone == profile.get("timezone"):
+            return profile
+        # Copy rather than mutate: the stored profile keeps what the user set,
+        # and only this session runs on the resolved value.
+        resolved = dict(profile)
+        resolved["timezone"] = egress_timezone
+        return resolved
+
+    @staticmethod
+    def _manual_proxy_url(profile: dict) -> str | None:
+        """Build the proxy URL for a manually configured profile, if any.
+
+        Mirrors what ``_build_launch_kwargs`` hands Playwright, so the geo
+        lookup goes out over the same route the browser will use. Credentials
+        are skipped: the geo providers are queried for a location, and they do
+        not need to authenticate to the proxy for that, while a failure to
+        authenticate would abort the lookup unnecessarily.
+        """
+        proxy = profile.get("proxy")
+        if not profile.get("proxy_enabled") or not proxy:
+            return None
+        return f"{proxy['type']}://{proxy['host']}:{proxy['port']}"
 
     def _start_proxy(self, profile: dict) -> str | None:
         if not profile.get("proxy_enabled") or profile.get("proxy_mode") != "mihomo":

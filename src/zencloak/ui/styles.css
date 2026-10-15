@@ -285,6 +285,79 @@ textarea {
 }
 
 /* ===== Profile list (dark) ===== */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  height: 32px;
+  border: 1px solid var(--sd-line);
+  border-radius: var(--radius-sm);
+  background: var(--sd-btn);
+  color: var(--sd-muted);
+  flex: none;
+}
+
+.sidebar-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.sidebar-search svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.sidebar-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sd-ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.sidebar-search input::placeholder {
+  color: var(--sd-muted);
+}
+
+/* Chromium draws its own clear button on type=search; it does not follow the
+   dark rail and looks like a stray dot. */
+.sidebar-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: none;
+}
+
+.tag-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--sd-line);
+  border-radius: 999px;
+  background: var(--sd-btn);
+  color: var(--sd-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.tag-chip:hover {
+  background: var(--sd-btn-hover);
+  color: var(--sd-ink);
+}
+
+.tag-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--sd-on-accent);
+}
+
 .profile-list {
   display: flex;
   flex-direction: column;
@@ -296,6 +369,30 @@ textarea {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.list-empty {
+  padding: 18px 8px;
+  color: var(--sd-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Tag chips inside a profile row. */
+.ptags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.ptag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--sd-hover);
+  color: var(--sd-muted);
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 /* Slim scrollbar, since the default light one is loud against the dark panel. */
@@ -785,6 +882,16 @@ textarea {
 .toggle-field {
   display: flex;
   align-items: center;
+  /* Toggles are short labels in a full-width row, so several fit side by
+     side. Without wrapping a long label would be clipped instead. */
+  flex-wrap: wrap;
+  gap: 8px 26px;
+}
+
+/* Pushes a second toggle clear of the first instead of letting them sit on
+   top of each other in the same flex line. */
+.toggle-inline {
+  margin-left: 0;
 }
 
 .toggle {

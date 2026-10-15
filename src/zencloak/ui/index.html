@@ -45,6 +45,12 @@
         </button>
       </div>
       <input id="importFile" type="file" accept=".json,application/json" hidden>
+      <input id="cookieFile" type="file" accept=".txt,.json,text/plain,application/json" hidden>
+      <div class="sidebar-search">
+        <i data-lucide="search"></i>
+        <input id="profileSearch" type="search" placeholder="搜索档案 / 标签" autocomplete="off">
+      </div>
+      <div id="tagFilter" class="tag-filter" hidden></div>
       <nav id="profileList" class="profile-list" aria-label="指纹档案"></nav>
       <div class="sidebar-foot">
         <button id="backupBtn" class="btn foot-btn" type="button" title="加密备份全部档案">
@@ -136,6 +142,10 @@
             <div class="field full">
               <label for="notes">备注</label>
               <textarea id="notes"></textarea>
+            </div>
+            <div class="field full">
+              <label for="tags">标签（用逗号分隔，用于分组和筛选）</label>
+              <input id="tags" type="text" placeholder="例如：美国, 广告, 主力">
             </div>
           </div>
 
@@ -402,6 +412,10 @@
                 <input id="humanize" type="checkbox">
                 <span>类人行为</span>
               </label>
+              <label class="toggle toggle-inline">
+                <input id="autoTimezone" type="checkbox">
+                <span>启动时按出口 IP 自动对齐时区</span>
+              </label>
             </div>
             <div class="field">
               <label for="humanPreset">行为预置</label>
@@ -444,6 +458,21 @@
                 </button>
               </div>
               <p class="hint">此档案在浏览器内下载的文件默认保存到这里。可填本机任意目录，例如 <code>D:\下载</code>；留空则用档案自带的下载目录。</p>
+            </div>
+            <div class="field full">
+              <label>Cookie（登录态）</label>
+              <div class="path-picker">
+                <button id="exportCookiesBtn" class="btn" type="button">
+                  <i data-lucide="download"></i>导出 Cookie
+                </button>
+                <button id="importCookiesBtn" class="btn" type="button">
+                  <i data-lucide="upload"></i>导入 Cookie
+                </button>
+              </div>
+              <p class="hint">
+                导出为 cookies.txt（兼容常见扩展与 <code>curl</code>）或 JSON。
+                Cookie 值由 Windows 用户绑定的密钥加密，导入前请先停止该档案。
+              </p>
             </div>
           </div>
         </form>

@@ -15,6 +15,14 @@ class FakeSessions:
         self.opened = []
         self.data_root = Path(data_root) if data_root else Path("browser-data")
 
+    def profile_dir(self, profile_id):
+        """Mirror the real resolver, including its traversal rejection."""
+        root = self.data_root.resolve()
+        candidate = (root / profile_id).resolve()
+        if not candidate.is_relative_to(root):
+            raise ValueError(f"非法档案 ID: {profile_id!r}")
+        return candidate
+
     def status(self, profile_id=None):
         if profile_id is None:
             return [
@@ -743,3 +751,77 @@ def test_kernels_endpoint(client):
     by_id = {k["id"]: k for k in kernels}
     assert by_id["cloak"]["available"] is True
     assert by_id["chromium"]["available"] is True
+
+
+def test_cookie_export_returns_netcape_and_json(client):
+    api_client, store, sessions = client
+    profile = store.create_profile(_draft("Cookie 档案"))
+    ns = api_client.get(f"/api/profiles/{profile['id']}/cookies?fmt=netscape")
+    assert ns.status_code == 200
+    assert ns.json()["format"] == "netscape"
+    assert "Netscape HTTP Cookie File" in ns.json()["content"]
+
+    js = api_client.get(f"/api/profiles/{profile['id']}/cookies?fmt=json")
+    assert js.status_code == 200
+    assert js.json()["content"].strip().startswith("[")
+
+
+def test_cookie_export_rejects_an_unknown_format(client):
+    api_client, store, _ = client
+    profile = store.create_profile(_draft())
+    response = api_client.get(f"/api/profiles/{profile['id']}/cookies?fmt=xml")
+    assert response.status_code == 400
+
+
+def test_cookie_import_writes_into_the_profile_jar(client):
+    api_client, store, sessions = client
+    profile = store.create_profile(_draft("导入目标"))
+    body = {
+        "content": "example.com\tTRUE\t/\tFALSE\t1893456000\tsid\tabc123\n"
+    }
+    response = api_client.post(f"/api/profiles/{profile['id']}/cookies", json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()["imported"] == 1
+
+    # Read it back through the API, which exercises the same jar.
+    exported = api_client.get(f"/api/profiles/{profile['id']}/cookies?fmt=json")
+    assert exported.json()["count"] == 1
+    import json as _json
+
+    cookies = _json.loads(exported.json()["content"])
+    assert cookies[0]["name"] == "sid"
+    assert cookies[0]["value"] == "abc123"
+
+
+def test_cookie_import_is_refused_while_the_profile_runs(client):
+    """Chromium holds the jar open, so a running profile must be rejected."""
+    api_client, store, sessions = client
+    profile = store.create_profile(_draft("运行中"))
+    sessions.sessions[profile["id"]] = {
+        "profile_id": profile["id"],
+        "status": "running",
+        "started_at": None,
+        "stopped_at": None,
+        "error": None,
+    }
+    response = api_client.post(
+        f"/api/profiles/{profile['id']}/cookies",
+        json={"content": "a.com\tTRUE\t/\tFALSE\t0\tn\tv\n"},
+    )
+    assert response.status_code == 409
+    assert "停止" in response.json()["detail"]
+
+
+def test_cookie_import_rejects_empty_and_malformed_content(client):
+    api_client, store, _ = client
+    profile = store.create_profile(_draft())
+    url = f"/api/profiles/{profile['id']}/cookies"
+
+    assert api_client.post(url, json={"content": "   "}).status_code == 400
+    assert api_client.post(url, json={"content": "not a cookie file"}).status_code == 400
+    assert api_client.post(url, json={}).status_code == 400
+
+
+def test_cookie_export_unknown_profile_is_404(client):
+    api_client, _, _ = client
+    assert api_client.get("/api/profiles/ffffffffffff/cookies").status_code == 404

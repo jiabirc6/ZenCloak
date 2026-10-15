@@ -758,3 +758,115 @@ def test_kernel_camoufox_missing_surfaces_install_hint(tmp_path, monkeypatch):
     manager.launch(profile)
     _wait_status(manager, "aaaaaaaaaaaa", "error")
     assert "Camoufox 未安装" in manager.status("aaaaaaaaaaaa")["error"]
+
+
+def test_auto_timezone_adopts_the_egress_timezone(tmp_path, monkeypatch):
+    """With the option on, the session runs on the IP's timezone.
+
+    The stored profile keeps what the user set: only the session's copy is
+    changed, so a later launch without the option reverts to the saved value.
+    """
+    import zencloak.core.sessions as sessions_mod
+
+    monkeypatch.setattr(
+        sessions_mod,
+        "lookup_ip_geo",
+        lambda url=None, timeout=10.0, **_: {"timezone": "America/Los_Angeles"},
+    )
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["auto_timezone"] = True
+    assert profile["timezone"] != "America/Los_Angeles"
+
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+
+    launched_kwargs = contexts[0][0]
+    assert launched_kwargs["timezone"] == "America/Los_Angeles"
+    # The profile the caller passed is untouched.
+    assert profile["timezone"] != "America/Los_Angeles"
+    manager.stop_all()
+
+
+def test_auto_timezone_off_keeps_the_stored_timezone(tmp_path, monkeypatch):
+    import zencloak.core.sessions as sessions_mod
+
+    called = []
+    monkeypatch.setattr(
+        sessions_mod,
+        "lookup_ip_geo",
+        lambda url=None, timeout=10.0, **_: called.append(url) or {"timezone": "UTC"},
+    )
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["auto_timezone"] = False
+
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+
+    assert contexts[0][0]["timezone"] == profile["timezone"]
+    assert not called, "未开启时不应发起出口 IP 查询"
+    manager.stop_all()
+
+
+def test_auto_timezone_survives_a_failed_lookup(tmp_path, monkeypatch):
+    """A geo lookup that fails must not stop the profile from launching."""
+    import zencloak.core.sessions as sessions_mod
+
+    def boom(*_a, **_k):
+        raise sessions_mod.ConsistencyError("network down")
+
+    monkeypatch.setattr(sessions_mod, "lookup_ip_geo", boom)
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["auto_timezone"] = True
+
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+
+    assert contexts[0][0]["timezone"] == profile["timezone"]
+    manager.stop_all()
+
+
+def test_auto_timezone_ignores_a_lookup_without_a_timezone(tmp_path, monkeypatch):
+    import zencloak.core.sessions as sessions_mod
+
+    monkeypatch.setattr(
+        sessions_mod, "lookup_ip_geo", lambda url=None, timeout=10.0, **_: {"ip": "1.2.3.4"}
+    )
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["auto_timezone"] = True
+
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert contexts[0][0]["timezone"] == profile["timezone"]
+    manager.stop_all()
+
+
+def test_auto_timezone_uses_the_manual_proxy_url(tmp_path, monkeypatch):
+    """The lookup must leave by the same route the browser will."""
+    import zencloak.core.sessions as sessions_mod
+
+    seen = []
+    monkeypatch.setattr(
+        sessions_mod,
+        "lookup_ip_geo",
+        lambda url=None, timeout=10.0, **_: seen.append(url) or {"timezone": "Asia/Tokyo"},
+    )
+    manager, contexts = _manager(tmp_path)
+    profile = _profile()
+    profile["auto_timezone"] = True
+    profile["proxy_enabled"] = True
+    profile["proxy_mode"] = "manual"
+    profile["proxy"] = {
+        "type": "socks5", "host": "10.0.0.1", "port": 1080,
+        "username": "", "password": "",
+    }
+
+    manager.launch(profile)
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+
+    assert seen == ["socks5://10.0.0.1:1080"]
+    assert contexts[0][0]["timezone"] == "Asia/Tokyo"
+    manager.stop_all()

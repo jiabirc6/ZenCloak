@@ -12,6 +12,14 @@ from fastapi.staticfiles import StaticFiles
 
 from zencloak.core.backup import BackupError, create_backup, restore_backup
 from zencloak.core.consistency import ConsistencyError, check_consistency, lookup_ip_geo
+from zencloak.core.cookies import (
+    CookieError,
+    cookies_to_json,
+    cookies_to_netscape,
+    parse_cookies,
+    read_cookies,
+    write_cookies,
+)
 from zencloak.core.downloads_dir import ask_directory, download_dir_for
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.health import build_report
@@ -130,6 +138,60 @@ def create_app(
         except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {"opened": True, "path": str(downloads_dir)}
+
+    @app.get("/api/profiles/{profile_id}/cookies")
+    def export_profile_cookies(profile_id: str, fmt: str = "json") -> dict:
+        """Return this profile's cookie jar for saving elsewhere.
+
+        Only the plaintext of each cookie is returned; the description says so
+        in ``encrypted`` terms because a value that could not be unwrapped is
+        reported rather than silently exported as blank.
+        """
+        profile = profile_or_404(profile_id)
+        user_data_dir = sessions.profile_dir(profile_id)
+        try:
+            cookies = read_cookies(user_data_dir)
+        except CookieError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        if fmt not in {"json", "netscape"}:
+            raise HTTPException(status_code=400, detail="格式只能是 json 或 netscape")
+        return {
+            "profile_id": profile_id,
+            "format": fmt,
+            "count": len(cookies),
+            "undecrypted": sum(1 for item in cookies if not item.get("decrypted", True)),
+            "content": (
+                cookies_to_netscape(cookies) if fmt == "netscape"
+                else cookies_to_json(cookies)
+            ),
+        }
+
+    @app.post("/api/profiles/{profile_id}/cookies")
+    def import_profile_cookies(profile_id: str, payload: dict[str, Any]) -> dict:
+        """Merge cookies from a file into this profile's jar.
+
+        Refuses while the profile is running: Chromium holds the jar open and
+        the write would either fail or be overwritten on exit.
+        """
+        profile_or_404(profile_id)
+        content = payload.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise HTTPException(status_code=400, detail="Cookie 内容不能为空")
+        state = sessions.status(profile_id)
+        if state.get("status") in {"launching", "running", "stopping"}:
+            raise HTTPException(
+                status_code=409, detail="档案正在运行，请先停止再导入 Cookie"
+            )
+        try:
+            cookies = parse_cookies(content, str(payload.get("format") or "auto"))
+        except CookieError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        user_data_dir = sessions.profile_dir(profile_id)
+        try:
+            written = write_cookies(user_data_dir, cookies)
+        except CookieError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {"imported": written, "parsed": len(cookies)}
 
     @app.post("/api/profiles/{profile_id}/pick-download-dir")
     def pick_profile_download_dir(profile_id: str) -> dict:

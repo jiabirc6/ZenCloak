@@ -22,6 +22,46 @@ def test_create_profile_persists_and_generates_id(store):
     assert store.get_profile(profile["id"]) == profile
 
 
+def test_profiles_default_to_no_tags_and_no_auto_timezone(store):
+    """Both fields are new, so an existing profile file must still load.
+
+    Profiles written before these fields existed have neither key; the
+    defaults are what keeps them readable rather than a validation error.
+    """
+    profile = store.create_profile(_draft())
+    assert profile["tags"] == []
+    assert profile["auto_timezone"] is False
+
+
+def test_tags_are_trimmed_and_deduplicated(store):
+    profile = store.create_profile(
+        _draft() | {"tags": ["  美国  ", "美国", "广告", "", "  "]}
+    )
+    # First spelling wins, blanks are dropped, order is preserved.
+    assert profile["tags"] == ["美国", "广告"]
+
+
+def test_tags_deduplicate_case_insensitively(store):
+    profile = store.create_profile(_draft() | {"tags": ["US", "us", "Us"]})
+    assert profile["tags"] == ["US"]
+
+
+def test_tags_reject_overlong_entries_and_lists(store):
+    # A single tag longer than the cap is dropped rather than failing the save,
+    # so a stray paste cannot block an unrelated edit.
+    profile = store.create_profile(_draft() | {"tags": ["x" * 40, "ok"]})
+    assert profile["tags"] == ["ok"]
+
+    with pytest.raises(ValidationError):
+        store.create_profile(_draft() | {"tags": [f"t{i}" for i in range(25)]})
+
+
+def test_auto_timezone_persists(store):
+    profile = store.create_profile(_draft() | {"auto_timezone": True})
+    assert profile["auto_timezone"] is True
+    assert store.get_profile(profile["id"])["auto_timezone"] is True
+
+
 def test_create_profile_ignores_client_supplied_id(store):
     profile = store.create_profile({**_draft(), "id": "..\\..\\..\\x"})
     assert len(profile["id"]) == 12
@@ -218,3 +258,38 @@ def test_proxy_password_is_encrypted_on_disk(store):
     assert "secret" not in raw
     loaded = store.get_profile(profile["id"])
     assert loaded["proxy"]["password"] == "secret"
+
+
+def test_reading_an_old_profile_file_fills_in_new_fields(store, tmp_path):
+    """A profile file written before a field existed must still read back whole.
+
+    Profiles are loaded from JSON without re-validation, so a field added to
+    the model afterwards is simply absent from every existing file. That made
+    the API's shape depend on whether a profile had been saved since the
+    field was added - the older ones came back without the key at all.
+    """
+    import json
+
+    profile = store.create_profile(_draft("旧档案"))
+    path = store.profiles_dir / f"{profile['id']}.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    # Simulate a file written before tags and auto_timezone existed.
+    raw.pop("tags", None)
+    raw.pop("auto_timezone", None)
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+    loaded = store.get_profile(profile["id"])
+    assert loaded["tags"] == []
+    assert loaded["auto_timezone"] is False
+    assert "tags" in loaded and "auto_timezone" in loaded
+
+
+def test_model_defaults_cover_every_defaulted_field():
+    """The fill-in table is derived from the model, so it cannot go stale."""
+    from zencloak.core.models import Profile
+    from zencloak.core.profiles import _MODEL_DEFAULTS
+    from pydantic_core import PydanticUndefined
+
+    for name, field in Profile.model_fields.items():
+        if field.default_factory is not None or field.default is not PydanticUndefined:
+            assert name in _MODEL_DEFAULTS, f"{name} 有默认值但未纳入补全表"

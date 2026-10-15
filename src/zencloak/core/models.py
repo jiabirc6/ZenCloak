@@ -55,6 +55,10 @@ class Profile(BaseModel):
     name: str = Field(min_length=1, max_length=32)
     color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
     notes: str = ""
+    # Free-form labels for grouping and filtering the list. Kept as plain
+    # strings rather than IDs: there is no tag registry to keep in sync, and a
+    # tag that no profile carries simply stops existing.
+    tags: list[str] = Field(default_factory=list)
     seed: int = Field(ge=10000, le=99999)
     kernel: Literal["cloak", "camoufox", "chromium"] = "cloak"
     timezone: str = Field(min_length=1)
@@ -73,6 +77,11 @@ class Profile(BaseModel):
     proxy_node: str | None = None
     humanize: bool = False
     human_preset: Literal["default", "careful", "quick"] = "default"
+    # When set, launching looks up the egress timezone and adopts it for this
+    # session instead of trusting the stored value. The consistency check
+    # already reported the mismatch; this applies the fix automatically rather
+    # than making the user click through it every time.
+    auto_timezone: bool = False
     translate_button: bool = False
     cdp_attach: bool = False
     spoof_voices: bool = True
@@ -131,6 +140,32 @@ class Profile(BaseModel):
         if not candidate.is_absolute():
             raise ValueError("下载目录必须是绝对路径")
         return str(candidate)
+
+    @field_validator("tags")
+    @classmethod
+    def normalize_tags(cls, value: list[str]) -> list[str]:
+        """Trim, drop blanks, de-duplicate case-insensitively, and cap the list.
+
+        Order is preserved so the UI shows tags in the order they were added.
+        Comparison is case-insensitive but the first spelling wins, which keeps
+        "US" and "us" from both showing up as separate chips.
+        """
+        if value is None:
+            return []
+        seen: set[str] = set()
+        result: list[str] = []
+        for item in value:
+            text = str(item).strip()
+            if not text or len(text) > 24:
+                continue
+            key = text.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(text)
+        if len(result) > 20:
+            raise ValueError("标签数量不能超过 20 个")
+        return result
 
     @model_validator(mode="after")
     def screen_pair_supported(self) -> "Profile":
