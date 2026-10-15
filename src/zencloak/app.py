@@ -18,13 +18,21 @@ from zencloak.core.lock import InstanceLock
 from zencloak.core.mihomo import ProxyManager
 from zencloak.core.profiles import ProfileStore
 from zencloak.core.sessions import SessionManager
-from zencloak.core.shutdown import stop_everything
+from zencloak.core.shutdown import configure as configure_shutdown_log
+from zencloak.core.shutdown import hard_exit, stop_everything
 
 
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def _trace_shutdown(message: str) -> None:
+    """Write one line to the shutdown trace (see core.shutdown)."""
+    from zencloak.core.shutdown import _trace
+
+    _trace(message)
 
 
 def _bundled_engine_dir() -> Path | None:
@@ -101,11 +109,11 @@ def _build_tray(window, sessions, server, proxy_manager=None):
         return None
 
     def _quit() -> None:
-        # Cleanup must run before os._exit, which skips finally blocks and
-        # would otherwise strand the mihomo children. Shared with the
-        # /api/shutdown route via core.shutdown.
-        stop_everything(sessions, proxy_manager, server)
-        os._exit(0)
+        # Logs on entry so a stuck exit is distinguishable from a tray click
+        # that never arrived: if shutdown.log has no "tray exit" line, the
+        # callback was not called at all.
+        _trace_shutdown("tray Exit menu clicked")
+        hard_exit(sessions, proxy_manager, server)
 
     def _show_window() -> None:
         try:
@@ -171,6 +179,10 @@ def main(argv: list[str] | None = None) -> None:
     if not instance_lock.acquire():
         _show_already_running()
         raise SystemExit("ZenCloak 已在运行")
+
+    # Exit tracing starts here, before anything that can hang on shutdown.
+    configure_shutdown_log(args.data_dir)
+    _trace_shutdown(f"started pid={os.getpid()}")
 
     store = ProfileStore(args.data_dir, auto_init=True)
     proxy_manager = ProxyManager(data_root=store.data_dir / "proxy")

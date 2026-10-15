@@ -4,6 +4,9 @@ Regression guard: ``POST /api/shutdown`` used to call ``os._exit(0)`` with no
 cleanup at all. Because ``os._exit`` skips finally blocks and atexit handlers,
 every mihomo child process leaked on that route while the tray Exit path
 cleaned up correctly.
+
+The exit trace is also covered here: ``os._exit`` leaves no traceback, so when
+an exit hangs the log is the only evidence of how far it got.
 """
 
 import pytest
@@ -176,3 +179,89 @@ def test_shutdown_route_cleans_up_before_exiting(monkeypatch):
     assert response.json() == {"ok": True}
     assert cleaned == ["called"]
     assert ("proxy", "stop_all", None) in log
+
+
+# ── exit trace ────────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def traced(tmp_path, monkeypatch):
+    """Point the trace at a temp file and restore it afterwards."""
+    path = shutdown_module.configure(tmp_path)
+    yield path
+    monkeypatch.setattr(shutdown_module, "_log_path", None)
+
+
+def test_trace_is_off_until_configured(tmp_path, monkeypatch):
+    """Importing the module must not touch the filesystem."""
+    monkeypatch.setattr(shutdown_module, "_log_path", None)
+    shutdown_module._trace("should go nowhere")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_stop_everything_records_each_step(traced):
+    log: list = []
+    stop_everything(Recorder("sessions", log), Recorder("proxy", log), ServerStub(log))
+    text = traced.read_text(encoding="utf-8")
+    assert "stop_everything start" in text
+    assert "sessions.stop_all begin" in text
+    assert "sessions.stop_all done" in text
+    assert "proxy_manager.stop_all begin" in text
+    assert "proxy_manager.stop_all done" in text
+    assert "stop_everything done" in text
+
+
+def test_trace_names_the_step_that_raised(traced):
+    """A raising step is recorded, so a hang after it is distinguishable."""
+    log: list = []
+    stop_everything(Recorder("sessions", log, explode=True), Recorder("proxy", log))
+    text = traced.read_text(encoding="utf-8")
+    assert "sessions.stop_all raised RuntimeError" in text
+    # Teardown continued past the failure.
+    assert "proxy_manager.stop_all done" in text
+
+
+def test_trace_lines_carry_a_timestamp_and_thread(traced):
+    stop_everything()
+    line = traced.read_text(encoding="utf-8").strip().split("\n")[0]
+    assert line.startswith("[")
+    assert "]" in line
+    # e.g. [2026-10-15 14:24:48.053] [MainThread] ...
+    stamp = line.split("]")[0].lstrip("[")
+    assert "." in stamp, f"timestamp lacks milliseconds: {stamp!r}"
+    assert "MainThread" in line or "Thread" in line
+
+
+def test_trace_survives_an_unwritable_path(tmp_path):
+    """Tracing must never be the reason shutdown stops."""
+    shutdown_module._log_path = tmp_path / "no-such-dir" / "shutdown.log"
+    try:
+        shutdown_module._trace("must not raise")
+        stop_everything()
+    finally:
+        shutdown_module._log_path = None
+
+
+def test_hard_exit_traces_then_exits(traced, monkeypatch):
+    exited: list[int] = []
+    monkeypatch.setattr(shutdown_module.os, "_exit", exited.append)
+    shutdown_module.hard_exit()
+    assert exited == [0]
+    assert "hard_exit called" in traced.read_text(encoding="utf-8")
+
+
+def test_spawn_hard_exit_traces_the_schedule(traced, monkeypatch):
+    """The schedule line proves the route was entered, before any cleanup."""
+    monkeypatch.setattr(shutdown_module.os, "_exit", lambda code: None)
+    monkeypatch.setattr(shutdown_module.time, "sleep", lambda _: None)
+
+    class InlineThread:
+        def __init__(self, target=None, daemon=None, **kw):
+            self._target = target
+
+        def start(self):
+            self._target()
+
+    monkeypatch.setattr(shutdown_module.threading, "Thread", InlineThread)
+    spawn_hard_exit()
+    assert "spawn_hard_exit scheduled" in traced.read_text(encoding="utf-8")
