@@ -443,7 +443,13 @@ def create_app(
         node = next((item for item in nodes if item.get("name") == node_name), None)
         if node is None:
             raise HTTPException(status_code=404, detail="节点不存在")
-        result = manager.test_nodes([node])[0]
+        try:
+            result = manager.test_nodes([node])[0]
+        except MihomoError as exc:
+            # A missing core or an unusable runtime dir is an upstream problem,
+            # not a request the caller got wrong. Letting it escape produced a
+            # bare 500 with no explanation.
+            raise HTTPException(status_code=502, detail=f"测速核心启动失败: {exc}") from exc
         if result["error"]:
             raise HTTPException(status_code=502, detail=f"节点连接失败: {result['error']}")
         return {"node": node_name, "latency_ms": result["delay_ms"]}
@@ -462,7 +468,10 @@ def create_app(
             for item in subscription_nodes_or_404(sub_id)
             if item.get("name") in wanted
         ]
-        results = manager.test_nodes(nodes)
+        try:
+            results = manager.test_nodes(nodes)
+        except MihomoError as exc:
+            raise HTTPException(status_code=502, detail=f"测速核心启动失败: {exc}") from exc
         return {
             "results": [
                 {

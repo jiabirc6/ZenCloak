@@ -191,7 +191,13 @@ class ProxyManager:
             binary = self.binary or ensure_binary()
             ports = allocate_ports(3)
             secret = secrets.token_urlsafe(16)
-            work_dir = self._runtime_dir(profile_id)
+            # The speed-test core is global and temporary, so it does not get a
+            # profile directory (and is not held to the profile-ID format).
+            work_dir = (
+                self._speedtest_dir()
+                if profile_id == self.SPEEDTEST_ID
+                else self._runtime_dir(profile_id)
+            )
             work_dir.mkdir(parents=True, exist_ok=True)
             config = generate_runtime_config(nodes, ports, secret)
             config_path = work_dir / "config.yaml"
@@ -290,6 +296,23 @@ class ProxyManager:
         try:
             return resolve_within(self.data_root / "runtime", require_id(profile_id, "档案 ID"))
         except ValueError as exc:
+            raise MihomoError(str(exc)) from exc
+
+    def _speedtest_dir(self) -> Path:
+        """Runtime dir for the throwaway core used by latency tests.
+
+        Kept separate from :meth:`_runtime_dir` on purpose. That one resolves a
+        *profile* directory and validates the name as a profile ID, which the
+        speed test has no reason to satisfy - it is a global, temporary core,
+        not one profile's. Folding it in there made ``require_id`` reject
+        ``__speedtest__`` and the whole test-nodes call returned a 500.
+
+        The name is a module constant, so it cannot carry user input; the
+        backstop still runs to keep every runtime path built the same way.
+        """
+        try:
+            return resolve_within(self.data_root / "runtime", self.SPEEDTEST_ID)
+        except ValueError as exc:  # pragma: no cover - constant cannot escape
             raise MihomoError(str(exc)) from exc
 
     def stop_all(self) -> None:

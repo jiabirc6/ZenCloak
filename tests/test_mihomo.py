@@ -265,3 +265,69 @@ def test_runtime_dir_accepts_valid_id(tmp_path):
     resolved = manager._runtime_dir("aaaaaaaaaaaa")
     assert resolved == (tmp_path / "runtime" / "aaaaaaaaaaaa").resolve()
     assert resolved.is_relative_to(tmp_path.resolve())
+
+
+def test_speedtest_id_is_not_treated_as_a_profile_id(tmp_path):
+    """The latency core must not be resolved through profile-ID validation.
+
+    Regression: ``start()`` sent every caller through ``_runtime_dir()``, which
+    validates the name with ``require_id`` (12 hex characters). The speed test
+    passes ``SPEEDTEST_ID``, so it raised ``MihomoError: 非法档案 ID:
+    '__speedtest__'`` before the core ever launched, and both test-nodes routes
+    answered 500 in about a second.
+
+    The existing test_nodes tests could not see this: they monkeypatch
+    ``start``, so ``_runtime_dir`` was never reached.
+    """
+    from zencloak.core.mihomo import ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path)
+
+    # The profile resolver still refuses it - that contract is unchanged.
+    with pytest.raises(Exception):
+        manager._runtime_dir(ProxyManager.SPEEDTEST_ID)
+
+    # The speed-test resolver accepts it, and stays inside the data root.
+    resolved = manager._speedtest_dir()
+    assert resolved == (tmp_path / "runtime" / ProxyManager.SPEEDTEST_ID).resolve()
+    assert resolved.is_relative_to(tmp_path.resolve())
+
+
+def test_start_uses_a_distinct_dir_for_the_speedtest_core(tmp_path, monkeypatch):
+    """``start(SPEEDTEST_ID, ...)`` must get past the runtime-dir step.
+
+    Pins the actual regression: the old body raised ``MihomoError: 非法档案 ID``
+    from ``_runtime_dir`` before doing anything else, so reaching the config
+    write is exactly what proves the fix. The launch is stubbed from the point
+    the process would start, so this stays a unit test.
+    """
+    from zencloak.core import mihomo as mihomo_module
+    from zencloak.core.mihomo import ProxyManager
+
+    manager = ProxyManager(data_root=tmp_path, binary=tmp_path / "mihomo.exe")
+    reached = {}
+
+    # Stop right where the real spawn happens; everything before it (the
+    # runtime dir, the config file) has already run by then.
+    def fake_popen(cmd, **kwargs):
+        reached["cmd"] = cmd
+        raise RuntimeError("stop-here")
+
+    monkeypatch.setattr(mihomo_module.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(mihomo_module, "allocate_ports", lambda n: [18001, 18002, 18003])
+    monkeypatch.setattr(mihomo_module.secrets, "token_urlsafe", lambda n: "secret")
+
+    with pytest.raises(Exception) as excinfo:
+        manager.start(ProxyManager.SPEEDTEST_ID, _nodes())
+
+    # The failure must be our deliberate stop, not the ID validation.
+    assert "stop-here" in str(excinfo.value), (
+        f"start() 在更早的步骤就失败了: {excinfo.value}"
+    )
+    assert "非法档案 ID" not in str(excinfo.value)
+
+    work_dir = (tmp_path / "runtime" / ProxyManager.SPEEDTEST_ID).resolve()
+    assert work_dir.is_dir(), "测速目录未创建"
+    assert (work_dir / "config.yaml").exists(), "测速配置未写入"
+    # And it stays inside the data root.
+    assert work_dir.is_relative_to(tmp_path.resolve())
