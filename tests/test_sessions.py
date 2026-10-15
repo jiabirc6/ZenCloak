@@ -1,5 +1,7 @@
+import threading
 import time
 from pathlib import Path
+from queue import Queue
 from types import SimpleNamespace
 
 import pytest
@@ -388,6 +390,88 @@ def test_stop_all_closes_all_contexts_and_joins_threads(tmp_path):
     with manager._lock:
         threads = [s["thread"] for s in manager._sessions.values() if s.get("thread")]
     assert all(not thread.is_alive() for thread in threads)
+
+
+def test_stop_does_not_deadlock_on_a_session_that_is_not_running(tmp_path):
+    """``stop()`` must not call ``status()`` while holding ``self._lock``.
+
+    Both take the same ``threading.Lock``, which is not reentrant. The old
+    body returned ``self.status(profile_id)`` from *inside* the ``with`` block
+    for any session that was not launching or running, so the call re-entered
+    the lock on the same thread and hung forever.
+
+    The reach is wider than the stopped case: ``stop_all()`` walks every
+    session, so a single non-running entry hung the whole teardown. The tray
+    Exit and the ``/api/shutdown`` route both go through it, which is why
+    quitting left the process alive with the window gone - reproduced live
+    before the fix, where ``shutdown.log`` stopped after
+    ``sessions.stop_all begin``.
+
+    Existing tests only ever stopped *running* sessions, so they exercised the
+    second ``return`` (outside the lock) and never this one.
+    """
+    manager, _ = _manager(tmp_path)
+    # Seed a session in a state that takes the early-return branch.
+    with manager._lock:
+        manager._sessions["cccccccccccc"] = {
+            "profile_id": "cccccccccccc",
+            "status": "stopped",
+            "started_at": None,
+            "stopped_at": None,
+            "error": None,
+            "stop_event": threading.Event(),
+            "urls": Queue(),
+            "context": None,
+            "thread": None,
+            "cdp_port": None,
+            "closer": None,
+        }
+
+    result: list = []
+
+    def call_stop() -> None:
+        manager.stop("cccccccccccc")
+        result.append("returned")
+
+    worker = threading.Thread(target=call_stop, daemon=True)
+    worker.start()
+    worker.join(timeout=5)
+    assert not worker.is_alive(), "stop() 在非运行状态的会话上死锁了"
+    assert result == ["returned"]
+
+
+def test_stop_all_survives_a_mix_of_session_states(tmp_path):
+    """A single non-running entry must not hang the whole stop_all pass."""
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile("aaaaaaaaaaaa"))
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    # An entry that is no longer running, which is what the live profile list
+    # looks like after one profile has already been stopped.
+    with manager._lock:
+        manager._sessions["dddddddddddd"] = {
+            "profile_id": "dddddddddddd",
+            "status": "stopped",
+            "started_at": None,
+            "stopped_at": None,
+            "error": None,
+            "stop_event": threading.Event(),
+            "urls": Queue(),
+            "context": None,
+            "thread": None,
+            "cdp_port": None,
+            "closer": None,
+        }
+
+    done: list = []
+    worker = threading.Thread(
+        target=lambda: (manager.stop_all(), done.append("returned")), daemon=True
+    )
+    worker.start()
+    worker.join(timeout=5)
+    assert not worker.is_alive(), "stop_all() 在混合状态下死锁了"
+    assert done == ["returned"]
+    _wait_status(manager, "aaaaaaaaaaaa", "stopped")
+    assert contexts[0][1].closed is True
 
 
 def test_launcher_error_records_error(tmp_path):

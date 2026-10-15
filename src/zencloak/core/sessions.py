@@ -291,12 +291,17 @@ class SessionManager:
                     pass
 
     def stop(self, profile_id: str) -> dict:
+        # ``status()`` acquires ``self._lock`` as well, and ``threading.Lock``
+        # is not reentrant, so it must never be called while this block holds
+        # the lock. Doing that deadlocked the caller outright: stop_all() walks
+        # every session, reaches the first one that is not running, and hangs
+        # with the lock held. That is what wedged the tray Exit and the
+        # /api/shutdown route together, since neither could finish its teardown.
         with self._lock:
             session = self._sessions.get(profile_id)
-            if not session or session["status"] not in {"launching", "running"}:
-                return self.status(profile_id)
-            session["stop_event"].set()
-            session["status"] = "stopping"
+            if session and session["status"] in {"launching", "running"}:
+                session["stop_event"].set()
+                session["status"] = "stopping"
         return self.status(profile_id)
 
     def stop_all(self, wait: bool = True) -> None:
