@@ -16,7 +16,7 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 ```powershell
 cd E:\codex\opencode-zen\zencloak
-python -m pytest tests -q          # 期望 323 passed，约 26 秒
+python -m pytest tests -q          # 期望 336 passed，约 36 秒
 git status --short                 # 期望无输出（工作树干净）
 git log --oneline -5
 ```
@@ -26,9 +26,9 @@ git log --oneline -5
 | 项目 | 值 |
 |---|---|
 | 版本 | `0.4.0` |
-| 测试 | ✅ 323 passed（约 26 秒） |
+| 测试 | ✅ 336 passed（约 36 秒） |
 | 工作树 | 干净 |
-| HEAD | `783246c` |
+| HEAD | `9313b58` |
 | 依赖 | cloakbrowser 0.3.31 / playwright 1.60.0 / fastapi 0.141.1 |
 
 ## 已完成
@@ -47,6 +47,7 @@ git log --oneline -5
 - CDP attach（R7）：外部 Playwright / Selenium 可接入运行中的档案
 - 下载目录可选 + 下载文件名保留扩展名
 - 翻译原地化：当前页遍历文本节点替换，不重载页面
+- 外观主题：浅色（默认）/ 深色 / 跟随系统，设置面板切换，localStorage 持久化
 - humanize 类人行为、回收站、批量启停、档案导入/导出/复制
 - 时区 56 项 / 语言 39 项
 - 单实例锁、一键启动/停止
@@ -55,9 +56,11 @@ git log --oneline -5
 
 ### 工程与测试
 
-- 323 个测试通过（后端单测 + UI 冒烟）
+- 336 个测试通过（后端单测 + UI 冒烟）
 - 统一 ID 校验（`core/identifiers.py`）、统一退出清理（`core/shutdown.py`）
 - DPAPI 错误码修复（`use_last_error=True`）+ 路径穿越堵漏
+- 全部配色收敛为 CSS token（`styles.css` 顶部两套主题变量），
+  两套主题各自完整；新增色值请走 token，硬编码会跟着不换主题。
 
 ### 打包与分发
 
@@ -80,7 +83,7 @@ git log --oneline -5
 | 项 | 来源 | 说明 |
 |---|---|---|
 | **R6 指纹克隆** | REMEDIATION | 从本机真实浏览器采集生成档案。**代码中零实现痕迹**（已核实）。方案见 REMEDIATION 第 89 行：复用 `health.py` 的 PROBE_JS，在非隐身临时上下文跑探测，采集 GPU/屏幕/UA/hardwareConcurrency/deviceMemory |
-| **R8 app.js 拆分** | REMEDIATION | `src/zencloak/ui/app.js` 约 1300 行。原计划要求在 R1/R2/R4 的 UI 改动**之前**做，但三项均已完成，**窗口已错过**，现在做难度更高。纯重构，无用户可见收益 |
+| **R8 app.js 拆分** | REMEDIATION | `src/zencloak/ui/app.js` 已约 1360 行。原计划要求在 R1/R2/R4 的 UI 改动**之前**做，但三项均已完成，**窗口已错过**，现在做难度更高。纯重构，无用户可见收益 |
 | **R5 第二步** | REMEDIATION | 已调查完毕，见下节。**待定** |
 | 代理池管理 | ROADMAP 近期 | 集中保存、绑定档案、连通性测试、出口 IP 显示。**代码中未实现** |
 | 扩展指纹参数 UI | ROADMAP 近期 | WebRTC、Canvas/WebGL/WebGPU 噪声、GPU、移动端指纹。**`models.py` 中无相关字段** |
@@ -134,52 +137,56 @@ REMEDIATION 第 85 行的验收标准（「有 → 抽象 keyring 后端」）�
 - 旧版 `pythonw -m zencloak` 和测试残留的 `ZenCloak.exe` 会占用单实例锁，导致新启动弹「已在运行」。处理方式：任务管理器结束所有 `ZenCloak` / `pythonw` 进程。
 - PyInstaller onefile 被强制结束后可能残留子进程，同样会占锁。
 
-#### 「点退出没反应」的挂起（2026-10-15 观察到，根因未确定）
+#### 「点退出没反应」的挂起 —— 已修复（`3c8fe14`）
 
-> ⚠️ **先读这段**：本小节的**根因尚未查明**。此前有一个版本在这里写了一个
-> 看起来很合理的根因，后来被实验推翻，已删除。**不要照着猜测去改
-> `shutdown.py`** —— 实测证明那条路径是正常的。详见下方「已排除的假设」。
+**现象**：点退出没反应；窗口关掉后 `pythonw.exe -m zencloak` 仍存活
+（`Responding=False`），只能强杀。`/api/shutdown` 一样卡。
 
-**观察到的事实**（2026-10-15，一个跑了约 17 小时的开发版实例）：
+**根因：`sessions.py` 的 `stop()` 在持有锁时调用了 `status()`，
+而 `status()` 自己也要拿同一把锁。**
 
-```
-进程状态
-  pythonw.exe -m zencloak，PID 23312，启动于 2026-10-14 17:10:28
-  Responding = False          <- Win32 消息循环没在泵消息
-  33 线程 / 1534 句柄 / CPU 1331s（30 秒内只涨 0.5s，不是在自旋）
-
-接口响应
-  GET  /api/profiles    → 0.01s 正常
-  GET  /api/sessions    → 挂死，>30s 无响应
-  POST /api/shutdown    → 0.1s 返回 {"ok":true}，但进程 30s 后仍存活
-
-退出后
-  cloakbrowser 的 chrome 子进程随之消失，mihomo 成为孤儿（父进程已死）
+```python
+def stop(self, profile_id):
+    with self._lock:                                    # ← 拿锁
+        session = self._sessions.get(profile_id)
+        if not session or session["status"] not in {"launching", "running"}:
+            return self.status(profile_id)              # ← 持锁时再调 status()
+        ...
+def status(self, profile_id=None):
+    with self._lock:                                    # ← 同一线程二次获取 → 死锁
 ```
 
-**未确定的部分**：`/api/sessions` 为何会挂、`os._exit(0)` 为何没有执行到，
-**都不清楚**。当时没有抓线程栈，进程已被强制结束，**证据已丢失**。
+`threading.Lock` **不可重入**，同一线程二次获取 = 永久卡死。
 
-**已排除的假设**（2026-10-15 用对照实验推翻，勿重复推测）：
+**为什么影响这么大**：`stop_all()` 遍历每一个会话，**只要有一个**档案
+不处于 `launching`/`running`（比如已停止的）就撞进这个分支 →
+整个退出流程卡住。而托盘退出和 `/api/shutdown` 走的是同一条路
+（`stop_everything`），所以两条都废。清理走不完，mihomo 就变成孤儿。
 
-| 假设 | 实验结果 | 结论 |
-|---|---|---|
-| 会话线程卡住 → `stop_all` 的 `join` 堵死清理路径 | 干净实例 POST `/api/shutdown` **0.6s 退出 code=0**；带活跃浏览器会话 **0.5s 退出 code=0** | ❌ 排除 |
-| `SessionManager.status()` 会阻塞 | 真实 `SessionManager` + 卡死线程，`status()` **0.000s 返回** | ❌ 排除 |
-| `stop_all(wait=True)` 会永久挂起 | 5.01s 返回（超时上限），不会永久挂起 | ❌ 排除 |
-| 有锁被跨阻塞调用持有 | 静态扫描 `sessions.py` 全部 `with self._lock` 块，**锁内零个阻塞调用** | ❌ 排除 |
+**定位手段**：`9173a8b` 加的 `shutdown.log` 追踪直接把范围缩到一行 ——
 
-关键点：`/api/shutdown` 走 `spawn_hard_exit` → `stop_everything(wait=False)`，
-**不等待会话线程**，所以它不可能被会话线程堵住。
-
-**下次复现时要做的**（这才是能定性的手段）：
-
-```powershell
-pip install py-spy
-py-spy dump --pid <PID>        # 抓全部线程栈，这是唯一能给出直接证据的手段
+```
+修复前：  sessions.stop_all begin        ← 卡死，永远没有下一行
+修复后：  sessions.stop_all begin
+          sessions.stop_all done
+          proxy_manager.stop_all done
+          stop_everything done
+          calling os._exit(0)
 ```
 
-**应急处置顺序**（先杀宿主，再收孤儿）——**这是已验证有效的手法，不是根因**：
+**修法**：早退分支不再在锁内调 `status()`，锁释放后统一调一次。
+
+**为什么以前测不出来**：现有测试**只停 `running` 状态的会话**，走的是
+另一个 `return`（那把锁已经释放）。这个分支从没被覆盖。
+新增 2 个测试（`test_stop_does_not_deadlock_on_a_session_that_is_not_running`、
+`test_stop_all_survives_a_mix_of_session_states`），已验证在旧代码上失败、
+在新代码上通过。
+
+**当次观察到的其他事实**（保留作为线索）：`Responding=False`、
+33 线程 / 1534 句柄、CPU 30 秒内只涨 0.5s（不是在自旋）、
+`/api/profiles` 0.01s 正常而 `/api/sessions` 挂死。
+
+**应急处置顺序**（若将来再遇到类似的退出卡死 —— 先杀宿主，再收孤儿）：
 
 ```powershell
 Stop-Process -Id <pythonw的PID> -Force    # 1. 先杀 ZenCloak 宿主
@@ -190,11 +197,17 @@ Stop-Process -Id <mihomo的PID> -Force     # 2. 再杀 mihomo 孤儿（父进程
 **验证干净的标志**：`zencloak.lock` 可读（未被占用）、无 `mihomo` 进程、
 无 `cloakbrowser` 路径下的 `chrome.exe`、无 `pythonw -m zencloak`。
 
-> **给下一任会话的提醒**：这里曾经有过一次误判 —— 凭 `sessions.py` 里
-> `thread.join(timeout=5)` 的存在，就推断"清理路径被堵死"，且未做任何验证
-> 就写进了本文档。后来一跑实验就推翻了。
+**若同类问题复发，先看 `~/.zencloak/shutdown.log`** —— 它逐行记录退出的
+每一步，最后一行就指明卡在哪。实在需要线程栈再用 `pip install py-spy` +
+`py-spy dump --pid <PID>`。
+
+> **本节曾经有过一次误判**（2026-10-15）：当时凭 `sessions.py` 里
+> `thread.join(timeout=5)` 的存在，就推断「清理路径被堵死」，未经任何验证
+> 写进了本文档，还据此提出要改 `shutdown.py`。后来对照实验推翻了这个说法
+> （干净实例和带浏览器会话的实例都 0.5~0.6s 正常退出），真因在另一处。
 > 教训：**报根因前必须能指出验证它的那条命令**；指不出来，就只能报
-> 「观察到 X」，不能报「因为 Y」。
+> 「观察到 X」，不能报「因为 Y」。这一条已写进全局 AGENTS.md 第五条。
+
 
 ### PyInstaller
 
