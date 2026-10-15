@@ -220,3 +220,151 @@ proxies:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
+
+
+@pytest.mark.skipif(not Path(CHROME).exists(), reason="Chrome not available")
+def test_sidebar_list_scrolls_and_keeps_footer_visible():
+    """The profile list must scroll itself, not push the footer buttons away.
+
+    Regression: ``.profile-list`` had neither ``flex:1`` nor ``overflow``, while
+    ``.sidebar`` carried ``overflow-y:auto``. Past a certain profile count the
+    list grew out of the panel, ``margin-top:auto`` on the footer had no slack
+    left, and the footer buttons were drawn across the last rows. Measured with
+    ten profiles at 1280x819 before the fix: the last row's box ran 586-641
+    while the footer started at 603, so three rows crossed it.
+
+    The regression: ``.profile-list`` had neither ``flex:1`` nor ``overflow``,
+    while ``.sidebar`` carried ``overflow-y:auto``. Past a certain profile count
+    the list grew out of the panel, ``margin-top:auto`` on the footer had no
+    slack left, and the footer buttons were drawn across the last rows.
+
+    Two tempting instruments were measured against the broken CSS and both were
+    wrong, so neither is used here:
+
+    * ``elementFromPoint`` over the footer band - false negative. The footer
+      follows the list in the DOM, so it paints on top and wins the hit test
+      even while three rows were drawn across it.
+    * comparing each row's rect against the footer rect - false positive. With
+      clipping on, rows scrolled out of view keep their layout boxes below the
+      list, so the comparison still reports a crossing with the fix applied.
+
+    What holds in both directions is the overflow contract itself: the list
+    clips (``overflow-y:auto``) and takes the free space (``flex:1``), the
+    sidebar does not scroll, the footer sits below the list's clipped edge and
+    inside the viewport, and the list actually scrolls without moving it. Each
+    of those was checked against the broken CSS and fails there.
+    """
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT / "src")
+    with tempfile.TemporaryDirectory(prefix="zencloak-sidebar-") as data_dir:
+        proc = subprocess.Popen(
+            [
+                sys.executable, "-u", "-m", "zencloak",
+                "--headless-ui", "--data-dir", data_dir,
+            ],
+            cwd=str(ROOT), env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            creationflags=CREATE_NO_WINDOW,
+        )
+        try:
+            url = api_token = None
+            for _ in range(120):
+                line = proc.stdout.readline()
+                if not line:
+                    break
+                match = re.search(r"http://127\.0\.0\.1:\d+", line)
+                if match and url is None:
+                    url = match.group(0)
+                token_match = re.search(r"API token: (\S+)", line)
+                if token_match and api_token is None:
+                    api_token = token_match.group(1)
+                if url and api_token:
+                    break
+            assert url and api_token, "UI server did not start"
+
+            headers = {"Authorization": f"Bearer {api_token}"}
+            # A "Local" profile already exists; add enough to overflow the panel.
+            for index in range(9):
+                request = urllib.request.Request(
+                    url + "/api/profiles",
+                    headers={**headers, "Content-Type": "application/json"},
+                    data=json.dumps({"name": f"overflow-{index:02d}"}).encode(),
+                    method="POST",
+                )
+                urllib.request.urlopen(request, timeout=5).read()
+
+            probe = """() => {
+              const list = document.querySelector('.profile-list');
+              const foot = document.querySelector('.sidebar-foot');
+              const side = document.querySelector('.sidebar');
+              const fb = foot.getBoundingClientRect();
+              const lb = list.getBoundingClientRect();
+              return {
+                count: document.querySelectorAll('.profile-item').length,
+                listOverflowY: getComputedStyle(list).overflowY,
+                listFlexGrow: getComputedStyle(list).flexGrow,
+                sidebarOverflowY: getComputedStyle(side).overflowY,
+                listScrollH: list.scrollHeight,
+                listClientH: list.clientHeight,
+                listBottom: Math.round(lb.bottom),
+                footTop: Math.round(fb.top),
+                footBottom: Math.round(fb.bottom),
+                scrollTop: Math.round(list.scrollTop),
+                viewportH: window.innerHeight,
+              };
+            }"""
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch(executable_path=CHROME, headless=True)
+                page = browser.new_page(viewport={"width": 1280, "height": 819})
+                page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                page.evaluate(
+                    "localStorage.setItem('zencloak_api_token', %s)"
+                    % json.dumps(api_token)
+                )
+                page.reload(wait_until="domcontentloaded")
+                page.wait_for_selector("#profileList .profile-item", timeout=10000)
+                page.wait_for_timeout(1000)
+
+                box = page.evaluate(probe)
+
+                # Guard: without enough rows overflowing, this proves nothing.
+                assert box["count"] >= 10, f"not enough profiles: {box}"
+                assert box["listScrollH"] > box["listClientH"], (
+                    f"列表本应溢出: {box}"
+                )
+
+                # The list clips and takes the free space; the sidebar does not
+                # scroll. On the broken CSS these read visible / 0 / auto.
+                assert box["listOverflowY"] == "auto", box
+                assert box["listFlexGrow"] == "1", box
+                assert box["sidebarOverflowY"] == "hidden", box
+
+                # Because the list clips, the footer starts below its bottom
+                # edge and stays inside the viewport. On the broken CSS the
+                # footer was pushed out and painted across the rows.
+                assert box["footTop"] >= box["listBottom"], (
+                    f"底部按钮与列表区域重叠: list bottom={box['listBottom']}, "
+                    f"foot top={box['footTop']}"
+                )
+                assert box["footBottom"] <= box["viewportH"], box
+
+                # Scrolling the list moves the rows but not the footer.
+                before = box["footTop"]
+                page.evaluate(
+                    "() => { const l = document.querySelector('.profile-list');"
+                    " l.scrollTop = l.scrollHeight; }"
+                )
+                page.wait_for_timeout(400)
+                after = page.evaluate(probe)
+                assert after["scrollTop"] > 0, "列表没有滚动"
+                assert after["footTop"] == before, (
+                    f"底部按钮跟着列表滚动了: {before} -> {after['footTop']}"
+                )
+                browser.close()
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()

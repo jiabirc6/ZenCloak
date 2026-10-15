@@ -72,7 +72,10 @@ textarea {
   padding: 20px 12px;
   background: var(--sidebar);
   color: var(--sd-ink);
-  overflow-y: auto;
+  /* The profile list owns the scrolling (see .profile-list). Scrolling the
+     sidebar itself let the fixed header and the footer buttons drift, and
+     with enough profiles the footer overlapped the last few rows. */
+  overflow: hidden;
 }
 
 .brand {
@@ -160,6 +163,30 @@ textarea {
   flex-direction: column;
   gap: 6px;
   min-height: 0;
+  /* Take the space between the header and the footer, and scroll inside it.
+     Without flex:1 the list grew to fit every profile and pushed the footer
+     buttons off the bottom, where they overlapped the last rows. */
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Slim scrollbar, since the default light one is loud against the dark panel. */
+.profile-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.profile-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+
+.profile-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.profile-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .profile-item {
