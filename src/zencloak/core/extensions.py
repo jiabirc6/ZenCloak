@@ -375,10 +375,12 @@ def build_newtab_extension(
 ) -> Path:
     """Write the ZenCloak helper extension: blank new tab plus page translate.
 
-    The translate UI is opt-in (``translate_button``). When off, no content
-    script is registered at all, so web pages observe zero DOM injection;
-    translation stays available via the context menu and the Alt+Shift+T
-    shortcut, neither of which is observable from page JS.
+    The content script is always registered. It is what receives the context
+    menu and Alt+Shift+T messages, so without it translation cannot run at
+    all - the menu items would post to a tab with no receiver and the error is
+    swallowed by design. It is also what injects the floating button, and that
+    button is the only thing ``translate_button`` still controls (default off,
+    so pages see no injected DOM unless the user asks for it).
     """
     ext_dir = Path(data_root) / profile["id"] / "extensions" / dir_name
     ext_dir.mkdir(parents=True, exist_ok=True)
@@ -390,13 +392,20 @@ def build_newtab_extension(
     manifest = {
         "manifest_version": 3,
         "name": "ZenCloak Helper",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "description": "ZenCloak in-place page translation helper.",
         "background": {"service_worker": "background.js"},
         "permissions": ["tabs", "contextMenus"],
         # The content script fetches the translate endpoint, so the page's own
         # origin must be allowed to reach it.
         "host_permissions": ["https://translate.googleapis.com/*"],
+        "content_scripts": [
+            {
+                "matches": ["http://*/*", "https://*/*"],
+                "js": ["content.js"],
+                "run_at": "document_idle",
+            }
+        ],
         "commands": {
             "translate-page": {
                 "suggested_key": {"default": "Alt+Shift+T"},
@@ -404,27 +413,17 @@ def build_newtab_extension(
             }
         },
     }
-    if profile.get("translate_button"):
-        manifest["content_scripts"] = [
-            {
-                "matches": ["http://*/*", "https://*/*"],
-                "js": ["content.js"],
-                "run_at": "document_idle",
-            }
-        ]
     (ext_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     (ext_dir / "background.js").write_text(
         _background_js(channel), encoding="utf-8"
     )
-    content_path = ext_dir / "content.js"
-    if profile.get("translate_button"):
-        content_path.write_text(
-            _content_js(channel, TRANSLATE_ENDPOINT), encoding="utf-8"
-        )
-    elif content_path.exists():
-        content_path.unlink()
+    # Always written: the manifest above always registers it, and a registered
+    # content script with no file would break the whole extension load.
+    (ext_dir / "content.js").write_text(
+        _content_js(channel, TRANSLATE_ENDPOINT), encoding="utf-8"
+    )
     return ext_dir
 
 

@@ -15,16 +15,25 @@ def _generated(profile: dict, tmp_path, dir_name: str = "newtab-v3"):
     return ext_dir, manifest, background, content
 
 
-def test_build_newtab_extension_default_has_no_content_script(tmp_path):
+def test_content_script_is_always_registered(tmp_path):
+    """The content script must exist on every profile, including the default.
+
+    It is the only receiver for the context-menu and shortcut messages. An
+    earlier revision made it opt-in via ``translate_button``, whose default is
+    off - so a default profile registered no content script, the menu posted
+    to a tab with no receiver, and the error is swallowed by design
+    (``void chrome.runtime.lastError``). Translation was silently dead.
+    """
     profile = {"id": "aaaaaaaaaaaa", "seed": 12345, "start_url": "https://example.com/path?q=1"}
-    ext_dir, manifest, background, _ = _generated(profile, tmp_path)
+    ext_dir, manifest, background, content = _generated(profile, tmp_path)
     assert "chrome_url_overrides" not in manifest  # 接管 NTP 会导致点 + 双标签
     assert manifest["background"]["service_worker"] == "background.js"
     assert manifest["name"] == "ZenCloak Helper"
     assert "contextMenus" in manifest["permissions"]
-    # 默认不注册 content script：网页侧零 DOM 注入
-    assert "content_scripts" not in manifest
-    assert not (ext_dir / "content.js").exists()
+    # 默认档案也必须注册 content script，否则翻译收不到消息
+    assert manifest["content_scripts"], "默认档案必须注册 content script"
+    assert manifest["content_scripts"][0]["js"] == ["content.js"]
+    assert (ext_dir / "content.js").exists()
     assert manifest["commands"]["translate-page"]["suggested_key"]["default"] == "Alt+Shift+T"
     assert not (ext_dir / "newtab.html").exists()
     assert "chrome.contextMenus.create" in background
@@ -33,6 +42,29 @@ def test_build_newtab_extension_default_has_no_content_script(tmp_path):
     assert "chrome.tabs.sendMessage" in background
     assert "{{" not in background
     assert "}}" not in background
+
+
+def test_translate_button_does_not_gate_the_content_script(tmp_path):
+    """Toggling translate_button must not change whether translation works."""
+    off = {"id": "aaaaaaaaaaaa", "seed": 12345, "translate_button": False}
+    on = {"id": "aaaaaaaaaaaa", "seed": 12345, "translate_button": True}
+    _, manifest_off, _, content_off = _generated(off, tmp_path / "off")
+    _, manifest_on, _, content_on = _generated(on, tmp_path / "on")
+
+    assert manifest_off["content_scripts"] == manifest_on["content_scripts"]
+    assert content_off == content_on
+
+
+def test_default_profile_injects_no_dom(tmp_path):
+    """R1 still holds: with the option off, pages see zero injected elements.
+
+    Translation runs entirely by rewriting text nodes; the floating button was
+    the only DOM injection and it is gone.
+    """
+    off = {"id": "aaaaaaaaaaaa", "seed": 12345, "translate_button": False}
+    _, _, _, content = _generated(off, tmp_path)
+    for injection in ("attachShadow", "createElement", "appendChild", "insertBefore"):
+        assert injection not in content, f"默认档案不应出现 {injection}"
 
 
 def test_translation_happens_in_place_never_in_a_new_tab(tmp_path):
@@ -58,7 +90,7 @@ def test_translation_happens_in_place_never_in_a_new_tab(tmp_path):
     assert "MutationObserver" in content, "动态加载的内容也要翻译"
 
 
-def test_content_script_is_opt_in_via_translate_button(tmp_path):
+def test_content_script_never_names_the_product(tmp_path):
     profile = {"id": "aaaaaaaaaaaa", "seed": 12345, "translate_button": True}
     ext_dir, manifest, _, content = _generated(profile, tmp_path)
     assert manifest["content_scripts"][0]["js"] == ["content.js"]
@@ -192,8 +224,12 @@ def test_cleanup_keeps_current_newtab_dir(tmp_path):
     assert current.exists()
 
 
-def test_disabled_translate_button_removes_stale_content_script(tmp_path):
-    """Turning the option off must delete a previously generated content.js."""
+def test_content_script_survives_toggling_the_option_off(tmp_path):
+    """Turning the option off must NOT remove the content script.
+
+    It used to delete content.js and drop the manifest entry, which killed
+    translation outright. The option now only affects the floating button.
+    """
     profile = {"id": "aaaaaaaaaaaa", "seed": 12345, "translate_button": True}
     ext_dir = build_newtab_extension(profile, tmp_path, dir_name="newtab-v3")
     assert (ext_dir / "content.js").exists()
@@ -202,5 +238,5 @@ def test_disabled_translate_button_removes_stale_content_script(tmp_path):
         {**profile, "translate_button": False}, tmp_path, dir_name="newtab-v3"
     )
     manifest = json.loads((ext_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert "content_scripts" not in manifest
-    assert not (ext_dir / "content.js").exists()
+    assert manifest["content_scripts"], "关闭选项后仍须注册 content script"
+    assert (ext_dir / "content.js").exists(), "关闭选项后仍须保留 content.js"
