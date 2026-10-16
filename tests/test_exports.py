@@ -116,3 +116,32 @@ def test_write_failure_is_reported_as_an_export_error(tmp_path, monkeypatch):
     monkeypatch.setattr(exports_module.Path, "write_text", boom, raising=False)
     with pytest.raises(ExportError):
         write_export(tmp_path, "whatever", "x", ".json")
+
+
+def test_a_custom_directory_overrides_the_default(tmp_path):
+    """A profile may name its own export folder, like its download folder."""
+    custom = tmp_path / "我的导出"
+    result = write_export(tmp_path, "a", "x", ".json", dest_dir=custom)
+    assert Path(result["path"]).parent == custom
+    assert Path(result["directory"]) == custom
+    assert Path(result["path"]).is_file()
+
+
+def test_the_custom_directory_is_created_on_demand(tmp_path):
+    """The folder may not exist yet; picking one before creating it is normal."""
+    custom = tmp_path / "还没有" / "这个目录"
+    assert not custom.exists()
+    result = write_export(tmp_path, "a", "x", ".json", dest_dir=custom)
+    assert custom.is_dir()
+    assert Path(result["path"]).is_file()
+
+
+def test_no_custom_directory_still_uses_the_default(tmp_path):
+    result = write_export(tmp_path, "a", "x", ".json")
+    assert Path(result["directory"]) == tmp_path / "exports"
+
+
+def test_export_dir_override_is_used_by_export_dir(tmp_path):
+    custom = tmp_path / "elsewhere"
+    assert export_dir(tmp_path, custom) == custom
+    assert custom.is_dir()

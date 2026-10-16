@@ -427,6 +427,7 @@ function renderForm() {
   $("cdpAttach").checked = Boolean(profile.cdp_attach);
   $("spoofVoices").checked = profile.spoof_voices !== false;
   $("downloadDir").value = profile.download_dir || "";
+  $("exportDir").value = profile.export_dir || "";
   const proxy = profile.proxy;
   const builtinProxy = Boolean(profile.proxy_enabled) && profile.proxy_mode === "mihomo";
   $("proxyBuiltin").checked = builtinProxy;
@@ -1006,6 +1007,7 @@ function readForm() {
     cdp_attach: $("cdpAttach").checked,
     spoof_voices: $("spoofVoices").checked,
     download_dir: $("downloadDir").value.trim() || null,
+    export_dir: $("exportDir").value.trim() || null,
     headless: false,
   };
 }
@@ -1574,6 +1576,12 @@ function bindEvents() {
 
   $("pickDownloadDir").addEventListener("click", pickDownloadDir);
   $("openDownloadDir").addEventListener("click", openDownloadDir);
+  $("pickExportDir").addEventListener("click", pickExportDir);
+  $("openExportDir").addEventListener("click", openExportDir);
+  $("clearExportDir").addEventListener("click", () => {
+    $("exportDir").value = "";
+    toast("已恢复为默认导出目录，点击「保存」生效");
+  });
   $("clearDownloadDir").addEventListener("click", () => {
     $("downloadDir").value = "";
     toast("已恢复为默认下载目录，保存后生效");
@@ -1610,6 +1618,34 @@ async function openDownloadDir() {
     // is what the browser would use anyway.
     await api(`/api/profiles/${state.selectedId}/open-downloads`, {
       method: "POST",
+    });
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function pickExportDir() {
+  if (!state.selectedId) return;
+  try {
+    const result = await api(
+      `/api/profiles/${state.selectedId}/pick-export-dir`,
+      { method: "POST" }
+    );
+    if (result.cancelled) return;
+    $("exportDir").value = result.path || "";
+    toast("已选择导出目录，点击「保存」生效");
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function openExportDir() {
+  if (!state.selectedId) return;
+  const typed = $("exportDir").value.trim();
+  try {
+    await api(`/api/profiles/${state.selectedId}/open-export-dir`, {
+      method: "POST",
+      body: JSON.stringify({ path: typed }),
     });
   } catch (error) {
     toast(error.message, true);

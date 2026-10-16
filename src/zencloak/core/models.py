@@ -3,7 +3,14 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from .fingerprint import (
     DEVICE_MEMORIES,
@@ -89,6 +96,10 @@ class Profile(BaseModel):
     # the data root, which is easy to lose track of; the UI lets the user pick
     # any folder on the machine instead.
     download_dir: str | None = None
+    # Where exports (profile JSON, cookie files) are written. Empty means the
+    # shared <data root>/exports. Deliberately the same shape and validation as
+    # download_dir, so the two controls behave identically.
+    export_dir: str | None = None
     start_url: str | None = None
     headless: bool = False
     created_at: str
@@ -120,25 +131,31 @@ class Profile(BaseModel):
     def normalize_start_url(cls, value: str | None) -> str | None:
         return normalize_start_url(value)
 
-    @field_validator("download_dir")
+    @field_validator("download_dir", "export_dir")
     @classmethod
-    def normalize_download_dir(cls, value: str | None) -> str | None:
-        """Blank means "use the per-profile default".
+    def normalize_dir(cls, value: str | None, info: ValidationInfo) -> str | None:
+        """Blank means "use the default location".
 
-        The path is deliberately not required to exist yet: a user may pick a
-        folder before creating it, and the session creates it at launch. It
-        only has to be an absolute path that does not contain a null byte.
+        Shared by the download and export folders: both are a user-chosen
+        absolute path that may not exist yet, and both want the same
+        normalisation - Explorer's "copy as path" adds quotes, and a
+        whitespace-only value should mean "default" rather than a folder named
+        with spaces.
+
+        The path is deliberately not required to exist: a user may pick a
+        folder before creating it, and the writer creates it on demand.
         """
+        label = "下载目录" if info.field_name == "download_dir" else "导出目录"
         if value is None:
             return None
         text = value.strip().strip('"')
         if not text:
             return None
         if "\x00" in text:
-            raise ValueError("下载目录包含非法字符")
+            raise ValueError(f"{label}包含非法字符")
         candidate = Path(text)
         if not candidate.is_absolute():
-            raise ValueError("下载目录必须是绝对路径")
+            raise ValueError(f"{label}必须是绝对路径")
         return str(candidate)
 
     @field_validator("tags")

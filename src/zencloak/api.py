@@ -130,7 +130,9 @@ def create_app(
         name = str(payload.get("name") or "").strip() or profile["name"]
         content = json.dumps(profile, ensure_ascii=False, indent=2)
         try:
-            written = write_export(store.root, name, content, ".json")
+            written = write_export(
+                store.root, name, content, ".json", profile.get("export_dir")
+            )
         except ExportError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {"files": [written], "directory": written["directory"]}
@@ -207,6 +209,7 @@ def create_app(
 
         undecrypted = sum(1 for item in cookies if not item.get("decrypted", True))
         name = str(payload.get("name") or "").strip() or profile["name"]
+        dest = profile.get("export_dir")
         written = []
         for stem_suffix, content in (
             ("-cookies.txt", cookies_to_netscape(cookies)),
@@ -214,7 +217,7 @@ def create_app(
         ):
             try:
                 written.append(
-                    write_export(store.root, f"{name}{stem_suffix}", content, "")
+                    write_export(store.root, f"{name}{stem_suffix}", content, "", dest)
                 )
             except ExportError as exc:
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -303,6 +306,40 @@ def create_app(
         if not chosen:
             return {"cancelled": True, "path": None}
         return {"cancelled": False, "path": chosen}
+
+    @app.post("/api/profiles/{profile_id}/pick-export-dir")
+    def pick_profile_export_dir(profile_id: str) -> dict:
+        """Choose a folder for this profile's exports.
+
+        Mirrors the download-folder picker, including starting the dialog at
+        whatever is currently set.
+        """
+        profile = profile_or_404(profile_id)
+        initial = profile.get("export_dir") or export_dir(store.root)
+        try:
+            chosen = ask_directory(initial=initial, title="选择导出目录")
+        except Exception as exc:  # noqa: BLE001 - surface picker problems to the UI
+            raise HTTPException(
+                status_code=500, detail=f"无法打开目录选择框: {exc}"
+            ) from exc
+        if not chosen:
+            return {"cancelled": True, "path": None}
+        return {"cancelled": False, "path": chosen}
+
+    @app.post("/api/profiles/{profile_id}/open-export-dir")
+    def open_profile_export_dir(profile_id: str, payload: dict) -> dict:
+        """Open a folder in Explorer to confirm a chosen export path."""
+        profile = profile_or_404(profile_id)
+        raw = str((payload or {}).get("path") or "").strip()
+        target = Path(raw) if raw else export_dir(store.root, profile.get("export_dir"))
+        if raw and not target.is_absolute():
+            raise HTTPException(status_code=400, detail="必须是绝对路径")
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(target))
+        except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {"opened": True, "path": str(target)}
 
     @app.post("/api/profiles/{profile_id}/open-download-dir")
     def open_profile_download_dir(profile_id: str, payload: dict) -> dict:

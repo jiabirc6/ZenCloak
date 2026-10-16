@@ -898,3 +898,62 @@ def test_exports_open_accepts_the_export_directory_itself(client, monkeypatch):
     response = api_client.post("/api/exports/open", json={"path": ""})
     assert response.status_code == 200
     assert opened and opened[0].endswith("exports")
+
+
+def test_export_honours_the_profiles_export_dir(client, tmp_path):
+    """The chosen folder must actually be used, not just stored."""
+    from pathlib import Path
+
+    api_client, store, _ = client
+    custom = tmp_path / "自定义导出"
+    profile = store.create_profile(_draft("有目录的档案"))
+    store.update_profile(profile["id"], {"export_dir": str(custom)})
+
+    api_client.post(
+        f"/api/profiles/{profile['id']}/cookies",
+        json={"content": "example.com\tTRUE\t/\tFALSE\t0\tsid\tabc\n"},
+    )
+    response = api_client.post(f"/api/profiles/{profile['id']}/cookies/export", json={})
+    assert response.status_code == 200, response.text
+    for item in response.json()["files"]:
+        assert Path(item["path"]).parent == custom, "没有落到档案指定的导出目录"
+    assert custom.is_dir()
+
+    profile_export = api_client.post(f"/api/profiles/{profile['id']}/export", json={})
+    assert Path(profile_export.json()["files"][0]["path"]).parent == custom
+
+
+def test_export_dir_defaults_to_the_shared_exports_folder(client):
+    from pathlib import Path
+
+    api_client, store, _ = client
+    profile = store.create_profile(_draft("默认目录"))
+    response = api_client.post(f"/api/profiles/{profile['id']}/export", json={})
+    assert Path(response.json()["files"][0]["path"]).parent == store.root / "exports"
+
+
+def test_open_export_dir_falls_back_to_the_profiles_folder(client, monkeypatch):
+    import zencloak.api as api_module
+
+    api_client, store, _ = client
+    custom = store.root / "自定义"
+    profile = store.create_profile(_draft("打开目录"))
+    store.update_profile(profile["id"], {"export_dir": str(custom)})
+
+    opened = []
+    monkeypatch.setattr(api_module.os, "startfile", lambda p: opened.append(p))
+    response = api_client.post(
+        f"/api/profiles/{profile['id']}/open-export-dir", json={"path": ""}
+    )
+    assert response.status_code == 200
+    assert opened == [str(custom)]
+
+
+def test_export_dir_rejects_a_relative_path_on_write(client):
+    """Validation happens at the model, so a bad path cannot be stored at all."""
+    from pydantic import ValidationError
+
+    _, store, _ = client
+    profile = store.create_profile(_draft("坏路径"))
+    with pytest.raises(ValidationError):
+        store.update_profile(profile["id"], {"export_dir": "relative/path"})

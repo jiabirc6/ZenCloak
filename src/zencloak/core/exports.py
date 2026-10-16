@@ -54,13 +54,17 @@ def safe_stem(name: str, fallback: str = "export") -> str:
     return text[:_MAX_STEM]
 
 
-def export_dir(store_root: str | Path) -> Path:
-    """Where exports land: ``<data root>/exports``.
+def export_dir(store_root: str | Path, override: str | Path | None = None) -> Path:
+    """Where exports land.
 
-    Alongside ``backups/``, which already works this way, so a user looking for
-    something ZenCloak saved has one place to look.
+    Defaults to ``<data root>/exports``, alongside ``backups/``, so a user
+    looking for something ZenCloak saved has one place to look. A profile may
+    name its own folder instead, matching how its download folder works.
     """
-    path = Path(store_root) / "exports"
+    if override:
+        path = Path(override)
+    else:
+        path = Path(store_root) / "exports"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -101,9 +105,16 @@ def _split_suffix(name: str) -> tuple[str, str]:
 
 
 def write_export(
-    store_root: str | Path, name: str, content: str, suffix: str
+    store_root: str | Path,
+    name: str,
+    content: str,
+    suffix: str,
+    dest_dir: str | Path | None = None,
 ) -> dict[str, object]:
     """Write ``content`` under the export directory and describe the result.
+
+    ``dest_dir`` overrides the default folder, which is how a profile's own
+    export folder is honoured.
 
     ``name`` may either be a bare stem with ``suffix`` supplied separately, or
     a complete filename with an empty ``suffix`` - the cookie export writes
@@ -114,7 +125,7 @@ def write_export(
     to open the folder - the complaint that started this was not knowing where
     an export had gone.
     """
-    directory = export_dir(store_root)
+    directory = export_dir(store_root, dest_dir)
     if suffix:
         stem = safe_stem(name)
         if not suffix.startswith("."):

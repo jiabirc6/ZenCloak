@@ -460,6 +460,21 @@
               <p class="hint">此档案在浏览器内下载的文件默认保存到这里。可填本机任意目录，例如 <code>D:\下载</code>；留空则用档案自带的下载目录。</p>
             </div>
             <div class="field full">
+              <label for="exportDir">导出目录</label>
+              <div class="path-picker">
+                <input id="exportDir" type="text" placeholder="留空则保存在 ZenCloak 数据目录的 exports 下">
+                <button id="pickExportDir" class="btn" type="button">
+                  <i data-lucide="folder-open"></i>选择
+                </button>
+                <button id="openExportDir" class="btn" type="button">
+                  <i data-lucide="external-link"></i>打开
+                </button>
+                <button id="clearExportDir" class="btn" type="button" title="恢复为默认导出目录">
+                  <i data-lucide="rotate-ccw"></i>
+                </button>
+              </div>
+            </div>
+            <div class="field full">
               <label>Cookie（登录态）</label>
               <div class="path-picker">
                 <button id="exportCookiesBtn" class="btn" type="button">
@@ -470,8 +485,9 @@
                 </button>
               </div>
               <p class="hint">
-                导出为 cookies.txt（兼容常见扩展与 <code>curl</code>）或 JSON。
-                Cookie 值由 Windows 用户绑定的密钥加密，导入前请先停止该档案。
+                导出为 cookies.txt（兼容常见扩展与 <code>curl</code>）或 JSON，
+                落到上面的导出目录。Cookie 值由 Windows 用户绑定的密钥加密，
+                导入前请先停止该档案。
               </p>
             </div>
           </div>
