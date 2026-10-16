@@ -1441,6 +1441,27 @@ textarea {
   background: var(--danger);
 }
 
+/* The toast itself ignores pointer events so it never blocks the page; an
+   action inside it has to opt back in to be clickable. */
+.toast-action {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.85;
+}
+
+.toast-action:hover {
+  opacity: 1;
+}
+
 /* ===== Recycle bin ===== */
 .recycle-view {
   flex: 1 1 auto;

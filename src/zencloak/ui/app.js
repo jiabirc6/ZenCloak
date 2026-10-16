@@ -148,13 +148,30 @@ async function api(path, options = {}) {
   return data;
 }
 
-function toast(message, isError = false) {
+/**
+ * Show a message, optionally with an action button.
+ *
+ * ``textContent`` is used for the message so a profile name cannot inject
+ * markup, and the action is added afterwards as a real element. A toast
+ * carrying an action stays up longer: 2.6s is not enough time to notice a
+ * button and click it.
+ */
+function toast(message, isError = false, action = null) {
   const el = $("toast");
   el.textContent = message;
   el.classList.toggle("error", isError);
   el.classList.add("show");
+  if (action) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toast-action";
+    button.textContent = action.label;
+    button.addEventListener("click", action.onClick);
+    el.appendChild(button);
+  }
   clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => el.classList.remove("show"), 2600);
+  const hold = action ? 8000 : 2600;
+  toast._timer = setTimeout(() => el.classList.remove("show"), hold);
 }
 
 function statusOf(profileId) {
@@ -889,43 +906,45 @@ async function applyIpTimezone() {
   }
 }
 
+/**
+ * Ask the backend to write the cookies out, then say where they went.
+ *
+ * The backend writes the file rather than the browser downloading it: inside
+ * pywebview a Blob download is cancelled silently unless ALLOW_DOWNLOADS is
+ * turned on, and the default is off, so this produced no file at all while
+ * looking like it had worked.
+ */
 async function exportCookies() {
   if (!state.selectedId) return;
   try {
-    // Offer both formats in one go: the format is only known once the file
-    // lands in whatever tool the user has, and asking first is a needless
-    // extra decision.
-    const data = await api(`/api/profiles/${state.selectedId}/cookies?fmt=netscape`);
-    if (!data.count) {
-      toast("该档案还没有 Cookie", true);
-      return;
-    }
-    const name = safeFileName(
-      state.profiles.find((p) => p.id === state.selectedId)?.name || "profile"
-    );
-    for (const [fmt, suffix, type, content] of [
-      ["netscape", "cookies.txt", "text/plain", data.content],
-      ["json", "cookies.json", "application/json", null],
-    ]) {
-      let body = content;
-      if (body === null) {
-        const other = await api(`/api/profiles/${state.selectedId}/cookies?fmt=json`);
-        body = other.content;
-      }
-      const blob = new Blob([body], { type });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `zencloak-${name}-${suffix}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(link.href);
-    }
+    const profile = state.profiles.find((p) => p.id === state.selectedId);
+    const result = await api(`/api/profiles/${state.selectedId}/cookies/export`, {
+      method: "POST",
+      body: JSON.stringify({ name: profile ? profile.name : "" }),
+    });
+    const names = result.files.map((f) => f.name).join("、");
     toast(
-      data.undecrypted
-        ? `已导出 ${data.count} 条 Cookie（${data.undecrypted} 条无法解密）`
-        : `已导出 ${data.count} 条 Cookie`
+      result.undecrypted
+        ? `已导出 ${result.count} 条到 ${names}（${result.undecrypted} 条无法解密）`
+        : `已导出 ${result.count} 条到 ${names}`,
+      false,
+      {
+        label: "打开所在文件夹",
+        onClick: () => revealExports(result.files[0].path),
+      }
     );
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+/** Reveal a written export in Explorer so the file can actually be found. */
+async function revealExports(path) {
+  try {
+    await api("/api/exports/open", {
+      method: "POST",
+      body: JSON.stringify({ path: path || "" }),
+    });
   } catch (error) {
     toast(error.message, true);
   }
@@ -1062,25 +1081,19 @@ async function duplicateProfile() {
   }
 }
 
-function safeFileName(name) {
-  return String(name || "profile").replace(/[\\/:*?"<>|]/g, "-");
-}
-
+/** Save one profile as JSON, written by the backend (see exportCookies). */
 async function exportProfile() {
   if (!state.selectedId) return;
   try {
-    const data = await api(`/api/profiles/${state.selectedId}/export`);
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
+    const profile = state.profiles.find((p) => p.id === state.selectedId);
+    const result = await api(`/api/profiles/${state.selectedId}/export`, {
+      method: "POST",
+      body: JSON.stringify({ name: profile ? profile.name : "" }),
     });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `zencloak-${safeFileName(data.name)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    toast("档案已导出");
+    toast(`档案已导出到 ${result.files[0].name}`, false, {
+      label: "打开所在文件夹",
+      onClick: () => revealExports(result.files[0].path),
+    });
   } catch (error) {
     toast(error.message, true);
   }

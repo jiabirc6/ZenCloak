@@ -1,4 +1,6 @@
+import json
 import os
+import subprocess
 import tempfile
 import time
 import urllib.request
@@ -21,6 +23,7 @@ from zencloak.core.cookies import (
     write_cookies,
 )
 from zencloak.core.downloads_dir import ask_directory, download_dir_for
+from zencloak.core.exports import ExportError, export_dir, write_export
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.health import build_report
 from zencloak.core.launchers import KERNELS, kernel_availability
@@ -115,6 +118,23 @@ def create_app(
     def export_profile(profile_id: str) -> dict:
         return profile_or_404(profile_id)
 
+    @app.post("/api/profiles/{profile_id}/export")
+    def save_profile(profile_id: str, payload: dict[str, Any]) -> dict:
+        """Write one profile as JSON to the export directory.
+
+        Same reason as the cookie export: this used to be a Blob the browser
+        was asked to save, and pywebview cancels those by default, so 导出档案
+        had never actually produced a file.
+        """
+        profile = profile_or_404(profile_id)
+        name = str(payload.get("name") or "").strip() or profile["name"]
+        content = json.dumps(profile, ensure_ascii=False, indent=2)
+        try:
+            written = write_export(store.root, name, content, ".json")
+        except ExportError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {"files": [written], "directory": written["directory"]}
+
     @app.post("/api/profiles/{profile_id}/duplicate")
     def duplicate_profile(profile_id: str) -> dict:
         profile_or_404(profile_id)
@@ -166,6 +186,45 @@ def create_app(
             ),
         }
 
+    @app.post("/api/profiles/{profile_id}/cookies/export")
+    def save_profile_cookies(profile_id: str, payload: dict[str, Any]) -> dict:
+        """Write this profile's cookies to a file and report where it went.
+
+        The file is written here rather than handed to the browser: pywebview
+        cancels downloads by default, so a Blob-based export produced nothing
+        at all. Two files are written, cookies.txt and cookies.json, because
+        which one is useful depends on the tool receiving it and guessing on
+        the user's behalf would be wrong half the time.
+        """
+        profile = profile_or_404(profile_id)
+        user_data_dir = sessions.profile_dir(profile_id)
+        try:
+            cookies = read_cookies(user_data_dir)
+        except CookieError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        if not cookies:
+            raise HTTPException(status_code=404, detail="该档案还没有 Cookie")
+
+        undecrypted = sum(1 for item in cookies if not item.get("decrypted", True))
+        name = str(payload.get("name") or "").strip() or profile["name"]
+        written = []
+        for stem_suffix, content in (
+            ("-cookies.txt", cookies_to_netscape(cookies)),
+            ("-cookies.json", cookies_to_json(cookies)),
+        ):
+            try:
+                written.append(
+                    write_export(store.root, f"{name}{stem_suffix}", content, "")
+                )
+            except ExportError as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {
+            "count": len(cookies),
+            "undecrypted": undecrypted,
+            "files": written,
+            "directory": written[0]["directory"],
+        }
+
     @app.post("/api/profiles/{profile_id}/cookies")
     def import_profile_cookies(profile_id: str, payload: dict[str, Any]) -> dict:
         """Merge cookies from a file into this profile's jar.
@@ -192,6 +251,39 @@ def create_app(
         except CookieError as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {"imported": written, "parsed": len(cookies)}
+
+    @app.post("/api/exports/open")
+    def open_exports_folder(payload: dict | None = None) -> dict:
+        """Reveal the exports folder, or one file inside it.
+
+        Opening the folder is what makes a written export findable: before
+        this, the export produced nothing and the user had no way to tell.
+        """
+        raw = str((payload or {}).get("path") or "").strip()
+        if raw:
+            target = Path(raw)
+            # Only reveal files this endpoint could have written, so a path
+            # from a request cannot be used to launch an arbitrary file.
+            root = export_dir(store.root).resolve()
+            try:
+                resolved = target.resolve()
+            except OSError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            if not resolved.is_relative_to(root):
+                raise HTTPException(status_code=400, detail="只能打开导出目录内的文件")
+            if resolved.is_file():
+                # explorer /select, highlights the file in its folder.
+                subprocess.Popen(["explorer", "/select,", str(resolved)])
+                return {"opened": True, "path": str(resolved.parent)}
+            target = resolved
+        else:
+            target = export_dir(store.root)
+        target.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(target))
+        except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return {"opened": True, "path": str(target)}
 
     @app.post("/api/profiles/{profile_id}/pick-download-dir")
     def pick_profile_download_dir(profile_id: str) -> dict:

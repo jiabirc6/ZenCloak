@@ -825,3 +825,76 @@ def test_cookie_import_rejects_empty_and_malformed_content(client):
 def test_cookie_export_unknown_profile_is_404(client):
     api_client, _, _ = client
     assert api_client.get("/api/profiles/ffffffffffff/cookies").status_code == 404
+
+
+def test_cookie_export_writes_files_and_reports_where(client):
+    """The export must land on disk; the browser is not asked to save it.
+
+    pywebview cancels downloads unless ALLOW_DOWNLOADS is set, and the default
+    is off, so the Blob-based export produced no file at all.
+    """
+    from pathlib import Path
+
+    api_client, store, _ = client
+    profile = store.create_profile(_draft("导出档案"))
+    api_client.post(
+        f"/api/profiles/{profile['id']}/cookies",
+        json={"content": "example.com\tTRUE\t/\tFALSE\t0\tsid\tabc\n"},
+    )
+
+    response = api_client.post(f"/api/profiles/{profile['id']}/cookies/export", json={})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["count"] == 1
+    assert len(body["files"]) == 2, "应同时写出 cookies.txt 与 cookies.json"
+
+    names = sorted(Path(f["path"]).name for f in body["files"])
+    assert any(n.endswith(".txt") for n in names)
+    assert any(n.endswith(".json") for n in names)
+    for item in body["files"]:
+        path = Path(item["path"])
+        assert path.is_file()
+        assert path.stat().st_size > 0
+
+
+def test_cookie_export_of_an_empty_jar_is_404(client):
+    api_client, store, _ = client
+    profile = store.create_profile(_draft("空档案"))
+    response = api_client.post(f"/api/profiles/{profile['id']}/cookies/export", json={})
+    assert response.status_code == 404
+
+
+def test_profile_export_writes_json(client):
+    from pathlib import Path
+    import json as _json
+
+    api_client, store, _ = client
+    profile = store.create_profile(_draft("导出我"))
+    response = api_client.post(f"/api/profiles/{profile['id']}/export", json={})
+    assert response.status_code == 200, response.text
+    path = Path(response.json()["files"][0]["path"])
+    assert path.is_file()
+    saved = _json.loads(path.read_text(encoding="utf-8"))
+    assert saved["name"] == "导出我"
+    assert saved["id"] == profile["id"]
+
+
+def test_exports_open_rejects_a_path_outside_the_export_dir(client):
+    """A path from a request must not be able to launch an arbitrary file."""
+    api_client, _, _ = client
+    response = api_client.post(
+        "/api/exports/open", json={"path": "C:\\Windows\\System32\\calc.exe"}
+    )
+    assert response.status_code == 400
+    assert "导出目录" in response.json()["detail"]
+
+
+def test_exports_open_accepts_the_export_directory_itself(client, monkeypatch):
+    import zencloak.api as api_module
+
+    api_client, store, _ = client
+    opened = []
+    monkeypatch.setattr(api_module.os, "startfile", lambda p: opened.append(p))
+    response = api_client.post("/api/exports/open", json={"path": ""})
+    assert response.status_code == 200
+    assert opened and opened[0].endswith("exports")
