@@ -1,6 +1,6 @@
 # ZenCloak HANDOFF
 
-最后更新：2026-10-15
+最后更新：2026-11-14
 
 > 本文档描述**当前真实状态**。核对方式见下方「如何确认现状」，不要凭本文档下结论。
 
@@ -16,19 +16,19 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 ```powershell
 cd E:\codex\opencode-zen\zencloak
-python -m pytest tests -q          # 期望 336 passed，约 36 秒
+python -m pytest tests -q          # 期望 407 passed，约 65 秒
 git status --short                 # 期望无输出（工作树干净）
 git log --oneline -5
 ```
 
-## 当前状态（2026-10-15 实测）
+## 当前状态（2026-11-14 实测）
 
 | 项目 | 值 |
 |---|---|
 | 版本 | `0.4.0` |
-| 测试 | ✅ 336 passed（约 36 秒） |
+| 测试 | ✅ 407 passed（约 65 秒） |
 | 工作树 | 干净 |
-| HEAD | `9313b58` |
+| HEAD | `ef2b422` |
 | 依赖 | cloakbrowser 0.3.31 / playwright 1.60.0 / fastapi 0.141.1 |
 
 ## 已完成
@@ -46,9 +46,11 @@ git log --oneline -5
 - 加密全量备份 / 恢复（R4）：AES-256 口令加密 zip，运行中档案自动跳过
 - CDP attach（R7）：外部 Playwright / Selenium 可接入运行中的档案
 - 下载目录可选 + 下载文件名保留扩展名
+- 导出文件由后端写盘，保存位置按档案可选（`7742bb7` / `ef2b422`）
 - 翻译原地化：当前页遍历文本节点替换，不重载页面
 - 外观主题：浅色（默认）/ 深色 / 跟随系统，设置面板切换，localStorage 持久化
 - humanize 类人行为、回收站、批量启停、档案导入/导出/复制
+- 档案搜索、标签、cookie 导入导出、时区跟随（`1a7d409`）
 - 时区 56 项 / 语言 39 项
 - 单实例锁、一键启动/停止
 - 本地 FastAPI，只监听 `127.0.0.1` 随机端口，Bearer token 保护
@@ -61,6 +63,7 @@ git log --oneline -5
 - DPAPI 错误码修复（`use_last_error=True`）+ 路径穿越堵漏
 - 全部配色收敛为 CSS token（`styles.css` 顶部两套主题变量），
   两套主题各自完整；新增色值请走 token，硬编码会跟着不换主题。
+- 修复节点延迟测速核心误经档案 ID 校验（`3f85659`）
 
 ### 打包与分发
 
@@ -83,7 +86,7 @@ git log --oneline -5
 | 项 | 来源 | 说明 |
 |---|---|---|
 | **R6 指纹克隆** | REMEDIATION | 从本机真实浏览器采集生成档案。**代码中零实现痕迹**（已核实）。方案见 REMEDIATION 第 89 行：复用 `health.py` 的 PROBE_JS，在非隐身临时上下文跑探测，采集 GPU/屏幕/UA/hardwareConcurrency/deviceMemory |
-| **R8 app.js 拆分** | REMEDIATION | `src/zencloak/ui/app.js` 已约 1360 行。原计划要求在 R1/R2/R4 的 UI 改动**之前**做，但三项均已完成，**窗口已错过**，现在做难度更高。纯重构，无用户可见收益 |
+| **R8 app.js 拆分** | REMEDIATION | `src/zencloak/ui/app.js` 已约 1670 行（2026-11-14 实测 1669）。原计划要求在 R1/R2/R4 的 UI 改动**之前**做，但三项均已完成，**窗口已错过**，现在做难度更高。纯重构，无用户可见收益 |
 | **R5 第二步** | REMEDIATION | 已调查完毕，见下节。**待定** |
 | 代理池管理 | ROADMAP 近期 | 集中保存、绑定档案、连通性测试、出口 IP 显示。**代码中未实现** |
 | 扩展指纹参数 UI | ROADMAP 近期 | WebRTC、Canvas/WebGL/WebGPU 噪声、GPU、移动端指纹。**`models.py` 中无相关字段** |
