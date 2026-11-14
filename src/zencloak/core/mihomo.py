@@ -61,6 +61,18 @@ _CN_DIRECT_SUFFIXES = (
     "yximgs.com", "douyin.com", "douyinpic.com", "douyinstatic.com",
     "bytedance.com", "zijieapi.com", "toutiao.com", "csdn.net",
     "jianshu.com", "juejin.cn",
+    # 电商 / 社区补充（.com 域名的国内站，不落在上面任何后缀下）
+    "goofish.com", "xiaohongshu.com", "xhscdn.com", "douban.com",
+    "dewu.com", "poizon.com", "vip.com", "suning.com", "smzdm.com",
+    "ctrip.com", "qunar.com", "trip.com", "fliggy.com", "maoyan.com",
+    # 招聘 / 生活服务
+    "zhipin.com", "liepin.com", "anjuke.com", "lianjia.com", "ke.com",
+    # 长视频 / 门户 / 搜索 / 工具
+    "iqiyi.com", "iqiyipic.com", "qiyipic.com", "sohu.com", "sogou.com",
+    "so.com", "qihoo.com", "360.cn", "xunlei.com", "hupu.com",
+    "coolapk.com",
+    # 金融（.com 域名的大行）
+    "cmbchina.com", "ccb.com", "abchina.com", "psbc.com", "cebbank.com",
 )
 
 
