@@ -426,6 +426,7 @@ function renderForm() {
   $("translateButton").checked = Boolean(profile.translate_button);
   $("cdpAttach").checked = Boolean(profile.cdp_attach);
   $("spoofVoices").checked = profile.spoof_voices !== false;
+  $("cnDirect").checked = profile.cn_direct !== false;
   $("downloadDir").value = profile.download_dir || "";
   $("exportDir").value = profile.export_dir || "";
   loadExtensions();
@@ -1007,6 +1008,7 @@ function readForm() {
     translate_button: $("translateButton").checked,
     cdp_attach: $("cdpAttach").checked,
     spoof_voices: $("spoofVoices").checked,
+    cn_direct: $("cnDirect").checked,
     download_dir: $("downloadDir").value.trim() || null,
     export_dir: $("exportDir").value.trim() || null,
     headless: false,

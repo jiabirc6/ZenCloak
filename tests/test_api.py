@@ -204,6 +204,7 @@ def test_create_profile_with_partial_payload_uses_defaults(client):
     assert profile["name"] == "简档"
     assert 10000 <= profile["seed"] <= 99999
     assert profile["timezone"] == "Asia/Shanghai"
+    assert profile["cn_direct"] is True
 
 
 def test_create_profile_rejects_invalid_payload(client):

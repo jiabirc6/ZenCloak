@@ -146,8 +146,8 @@ class FakeProxyManager:
     def load_nodes(self, sub_id):
         return [{"name": "美国节点", "type": "vless", "server": "1.2.3.4", "port": 443}]
 
-    def start(self, profile_id, nodes, node_name=None):
-        self.started.append((profile_id, node_name))
+    def start(self, profile_id, nodes, node_name=None, cn_direct=True):
+        self.started.append((profile_id, node_name, cn_direct))
         return SimpleNamespace(mixed_port=17891)
 
     def stop(self, profile_id):
@@ -263,7 +263,7 @@ def test_launch_starts_mihomo_proxy_and_passes_server(tmp_path):
     )
     manager.launch(profile)
     _wait_status(manager, "aaaaaaaaaaaa", "running")
-    assert proxy.started == [("aaaaaaaaaaaa", "美国节点")]
+    assert proxy.started == [("aaaaaaaaaaaa", "美国节点", True)]
     assert contexts[0][0]["proxy"] == {"server": "socks5://127.0.0.1:17891"}
     manager.stop("aaaaaaaaaaaa")
     _wait_status(manager, "aaaaaaaaaaaa", "stopped")

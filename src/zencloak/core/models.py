@@ -82,6 +82,11 @@ class Profile(BaseModel):
     proxy_subscription_id: str | None = None
     proxy_region: str | None = None
     proxy_node: str | None = None
+    # Built-in mihomo runs in rule mode: mainland domains and private ranges
+    # go DIRECT (operating mainland sites from a US exit is slow and a
+    # risk-control signal), everything else rides the selected node. Turn
+    # off to restore global mode - every connection through the node.
+    cn_direct: bool = True
     humanize: bool = False
     human_preset: Literal["default", "careful", "quick"] = "default"
     # When set, launching looks up the egress timezone and adopts it for this

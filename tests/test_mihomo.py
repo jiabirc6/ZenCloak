@@ -24,7 +24,9 @@ def _nodes():
 
 
 def test_generate_runtime_config_is_valid_global_config():
-    config = generate_runtime_config(_nodes(), [17891, 19091, 15353], "secret")
+    config = generate_runtime_config(
+        _nodes(), [17891, 19091, 15353], "secret", cn_direct=False
+    )
     assert config["mixed-port"] == 17891
     assert config["external-controller"] == "127.0.0.1:19091"
     assert config["mode"] == "global"
@@ -331,3 +333,26 @@ def test_start_uses_a_distinct_dir_for_the_speedtest_core(tmp_path, monkeypatch)
     assert (work_dir / "config.yaml").exists(), "测速配置未写入"
     # And it stays inside the data root.
     assert work_dir.is_relative_to(tmp_path.resolve())
+
+
+def test_generate_runtime_config_cn_direct_uses_rule_mode():
+    config = generate_runtime_config(_nodes(), [17891, 19091, 15353], "secret")
+    assert config["mode"] == "rule"
+    rules = config["rules"]
+    assert "DOMAIN-SUFFIX,taobao.com,DIRECT" in rules
+    assert "DOMAIN-SUFFIX,alicdn.com,DIRECT" in rules
+    assert "DOMAIN-SUFFIX,cn,DIRECT" in rules
+    assert "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve" in rules
+    assert rules[-1] == "MATCH,GLOBAL"
+    # 兜底组不变：非直连流量仍走用户选的节点
+    assert config["proxy-groups"][0]["name"] == "GLOBAL"
+    dumped = yaml.safe_dump(config, allow_unicode=True, sort_keys=False)
+    assert yaml.safe_load(dumped)["mode"] == "rule"
+
+
+def test_generate_runtime_config_without_cn_direct_stays_global():
+    config = generate_runtime_config(
+        _nodes(), [17891, 19091, 15353], "secret", cn_direct=False
+    )
+    assert config["mode"] == "global"
+    assert config["rules"] == ["MATCH,GLOBAL"]

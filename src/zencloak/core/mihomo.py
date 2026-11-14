@@ -32,6 +32,37 @@ class MihomoError(RuntimeError):
 
 MIHOMO_PID_FILE = "mihomo.pid"
 
+# Mainland domains that must never leave through the proxy. Operating
+# mainland sites (Taobao etc.) from a US exit is both slow and a
+# risk-control signal for mainland accounts, so in cn-direct mode these are
+# matched before the MATCH fallback. Deliberately a hand-curated list: the
+# GeoIP/GeoSite databases would need a network download at first start and
+# rule loading must not depend on that.
+_CN_DIRECT_SUFFIXES = (
+    # 阿里系（淘宝/天猫/支付宝/阿里云）
+    "taobao.com", "tmall.com", "tmall.hk", "alibaba.com", "alibaba-inc.com",
+    "1688.com", "alipay.com", "alipayobjects.com", "alicdn.com", "aliyuncs.com",
+    "aliyun.com", "taobaocdn.com", "tbcdn.cn", "amap.com", "autonavi.com",
+    # 京东 / 拼多多
+    "jd.com", "jd.hk", "360buyimg.com", "jcloud.com",
+    "pinduoduo.com", "yangkeduo.com", "pddpic.com",
+    # 腾讯系
+    "qq.com", "wechat.com", "weixin.com", "tencent.com", "gtimg.com",
+    "myqcloud.com", "qcloud.com",
+    # 百度系
+    "baidu.com", "bdstatic.com", "bdimg.com", "bcebos.com", "baidubce.com",
+    # B 站 / 知乎 / 微博 / 网易
+    "bilibili.com", "biliapi.net", "biliapi.com", "hdslb.com", "bilivideo.com",
+    "zhihu.com", "zhimg.com", "weibo.com", "weibo.cn", "sina.com.cn",
+    "sinaimg.cn", "163.com", "126.net", "netease.com", "youdao.com",
+    # 小米 / 本地生活 / 短视频 / 内容社区
+    "mi.com", "xiaomi.com", "ele.me", "elemecdn.com", "meituan.com",
+    "dianping.com", "meituan.net", "kuaishou.com", "gifshow.com",
+    "yximgs.com", "douyin.com", "douyinpic.com", "douyinstatic.com",
+    "bytedance.com", "zijieapi.com", "toutiao.com", "csdn.net",
+    "jianshu.com", "juejin.cn",
+)
+
 
 def _terminate_mihomo_pid(pid: int) -> bool:
     """Kill a stale mihomo process by PID, verifying its image path first.
@@ -130,16 +161,37 @@ def generate_runtime_config(
     nodes: list[dict[str, Any]],
     ports: list[int],
     secret: str,
+    cn_direct: bool = True,
 ) -> dict[str, Any]:
-    """Build a minimal global-mode mihomo config for one profile."""
+    """Build a minimal mihomo config for one profile.
+
+    With ``cn_direct`` (the default) the core runs in rule mode: mainland
+    domains and private ranges go DIRECT, everything else rides the GLOBAL
+    group the user selects a node in. Without it the historical global-mode
+    behaviour applies - every connection takes the selected node.
+    """
     if len(ports) < 3:
         raise ValueError("需要 mixed/controller/dns 三个端口")
     mixed_port, controller_port, dns_port = ports
     names = [node["name"] for node in nodes]
+    if cn_direct:
+        mode = "rule"
+        rules = [
+            *(f"DOMAIN-SUFFIX,{domain},DIRECT" for domain in _CN_DIRECT_SUFFIXES),
+            "DOMAIN-SUFFIX,cn,DIRECT",
+            "IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
+            "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+            "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
+            "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
+            "MATCH,GLOBAL",
+        ]
+    else:
+        mode = "global"
+        rules = ["MATCH,GLOBAL"]
     return {
         "mixed-port": mixed_port,
         "allow-lan": False,
-        "mode": "global",
+        "mode": mode,
         "log-level": "silent",
         "external-controller": f"127.0.0.1:{controller_port}",
         "secret": secret,
@@ -154,7 +206,7 @@ def generate_runtime_config(
         "proxy-groups": [
             {"name": "GLOBAL", "type": "select", "proxies": names}
         ],
-        "rules": ["MATCH,GLOBAL"],
+        "rules": rules,
     }
 
 
@@ -181,6 +233,7 @@ class ProxyManager:
         profile_id: str,
         nodes: list[dict[str, Any]],
         node_name: str | None = None,
+        cn_direct: bool = True,
     ) -> ProxyHandle:
         # RLock (not Lock): the failure path calls self.stop() while held.
         with self._lock:
@@ -199,7 +252,9 @@ class ProxyManager:
                 else self._runtime_dir(profile_id)
             )
             work_dir.mkdir(parents=True, exist_ok=True)
-            config = generate_runtime_config(nodes, ports, secret)
+            config = generate_runtime_config(
+                nodes, ports, secret, cn_direct=cn_direct
+            )
             config_path = work_dir / "config.yaml"
             config_path.write_text(
                 yaml.safe_dump(config, allow_unicode=True, sort_keys=False),

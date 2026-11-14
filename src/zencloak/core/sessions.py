@@ -531,6 +531,7 @@ class SessionManager:
             profile["id"],
             nodes,
             profile.get("proxy_node"),
+            cn_direct=profile.get("cn_direct", True),
         )
         return f"socks5://127.0.0.1:{handle.mixed_port}"
 
