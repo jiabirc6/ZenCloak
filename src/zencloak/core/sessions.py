@@ -11,7 +11,11 @@ from cloakbrowser import launch_persistent_context
 
 from .consistency import lookup_ip_geo
 from .downloads import attach_download_handler
-from .extensions import build_newtab_extension, cleanup_stale_newtab_extensions
+from .extensions import (
+    build_newtab_extension,
+    cleanup_stale_newtab_extensions,
+    user_extension_dirs,
+)
 from .health import PROBE_JS
 from .launchers import launch_extra_kernel
 from .proxy_runtime import allocate_ports
@@ -63,6 +67,17 @@ if (
     _cloakbrowser_browser.IGNORE_DEFAULT_ARGS = [
         *_cloakbrowser_browser.IGNORE_DEFAULT_ARGS,
         f"--disable-features={_PLAYWRIGHT_DEFAULT_DISABLE_FEATURES}",
+    ]
+
+# Playwright disables all extensions by default (a test-determinism
+# convenience). ZenCloak users may load extensions (developer-mode unpacked
+# or imported), so the default must be ignored. The ZenCloak Helper rides
+# --load-extension, which Chromium loads regardless, but extensions
+# registered in the profile do not survive this flag.
+if "--disable-extensions" not in _cloakbrowser_browser.IGNORE_DEFAULT_ARGS:
+    _cloakbrowser_browser.IGNORE_DEFAULT_ARGS = [
+        *_cloakbrowser_browser.IGNORE_DEFAULT_ARGS,
+        "--disable-extensions",
     ]
 
 
@@ -208,9 +223,13 @@ class SessionManager:
                 )
             else:
                 # Camoufox is Firefox: MV3 Chromium extensions do not apply.
-                ext_dir = (
-                    self._extension_dir(profile) if kernel == "chromium" else None
-                )
+                if kernel == "chromium":
+                    ext_dir = ",".join(
+                        [self._extension_dir(profile)]
+                        + user_extension_dirs(self.data_root, profile["id"])
+                    )
+                else:
+                    ext_dir = None
                 context, closer = launch_extra_kernel(
                     kernel, profile, self.data_root, proxy_server, cdp_port, ext_dir
                 )
@@ -427,7 +446,15 @@ class SessionManager:
         downloads_dir = self._downloads_dir(profile)
         downloads_dir.mkdir(parents=True, exist_ok=True)
         kwargs["downloads_path"] = str(downloads_dir)
-        kwargs["extension_paths"] = [self._extension_dir(profile)]
+        # Load the helper plus any user-imported extensions via a plain
+        # --load-extension flag instead of cloakbrowser's extension_paths
+        # kwarg: that kwarg also emits --disable-extensions-except, which
+        # silently disables any extension the user loads afterwards
+        # (developer-mode unpacked or imported). The except flag must never
+        # be present or user extensions die.
+        ext_dirs = [self._extension_dir(profile)]
+        ext_dirs += user_extension_dirs(self.data_root, profile["id"])
+        args.append(f"--load-extension={','.join(ext_dirs)}")
         proxy = profile.get("proxy")
         if proxy_server:
             kwargs["proxy"] = {"server": proxy_server}

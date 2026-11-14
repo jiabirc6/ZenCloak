@@ -308,18 +308,33 @@ def test_launch_loads_newtab_extension_when_start_url_set(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile(start_url="https://example.com/path?q=1"))
     _wait_status(manager, "aaaaaaaaaaaa", "running")
-    extension_paths = contexts[0][0]["extension_paths"]
-    assert len(extension_paths) == 1
-    assert extension_paths[0].endswith("newtab-v3")
+    load_args = [a for a in contexts[0][0]["args"] if a.startswith("--load-extension=")]
+    assert len(load_args) == 1
+    assert load_args[0].endswith("newtab-v3")
 
 
 def test_launch_always_loads_newtab_extension(tmp_path):
     manager, contexts = _manager(tmp_path)
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
-    extension_paths = contexts[0][0]["extension_paths"]
-    assert len(extension_paths) == 1
-    assert extension_paths[0].endswith("newtab-v3")
+    load_args = [a for a in contexts[0][0]["args"] if a.startswith("--load-extension=")]
+    assert len(load_args) == 1
+    assert load_args[0].endswith("newtab-v3")
+
+
+def test_launch_never_disables_user_extensions(tmp_path):
+    # cloakbrowser's extension_paths kwarg also emits
+    # --disable-extensions-except, and Playwright defaults carry
+    # --disable-extensions; either flag kills extensions the user loads
+    # via developer mode. ZenCloak must not let either through.
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert not any(
+        a.startswith("--disable-extensions-except")
+        for a in contexts[0][0]["args"]
+    )
+    assert "--disable-extensions" not in contexts[0][0]["args"]
 
 
 def test_open_url_after_running_opens_new_page(tmp_path):
@@ -870,3 +885,16 @@ def test_auto_timezone_uses_the_manual_proxy_url(tmp_path, monkeypatch):
     assert seen == ["socks5://10.0.0.1:1080"]
     assert contexts[0][0]["timezone"] == "Asia/Tokyo"
     manager.stop_all()
+
+
+def test_launch_loads_user_extensions(tmp_path):
+    manager, contexts = _manager(tmp_path)
+    user_ext = tmp_path / "aaaaaaaaaaaa" / "extensions" / "user-foo"
+    user_ext.mkdir(parents=True)
+    (user_ext / "manifest.json").write_text("{}", encoding="utf-8")
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    load_args = [a for a in contexts[0][0]["args"] if a.startswith("--load-extension=")]
+    assert len(load_args) == 1
+    assert "newtab-v3" in load_args[0]
+    assert "user-foo" in load_args[0]
