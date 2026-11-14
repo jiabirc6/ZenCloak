@@ -18,7 +18,7 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 ```powershell
 cd E:\codex\opencode-zen\zencloak
-python -m pytest tests -q          # 期望 407 passed，约 65 秒
+python -m pytest tests -q          # 期望 422 passed，约 70 秒
 git status --short                 # 期望无输出（工作树干净）
 git log --oneline -5
 ```
@@ -28,9 +28,9 @@ git log --oneline -5
 | 项目 | 值 |
 |---|---|
 | 版本 | `0.4.0` |
-| 测试 | ✅ 407 passed（约 65 秒） |
+| 测试 | ✅ 422 passed（约 70 秒） |
 | 工作树 | 干净 |
-| HEAD | `ef2b422` |
+| HEAD | `c923888` |
 | 依赖 | cloakbrowser 0.3.31 / playwright 1.60.0 / fastapi 0.141.1 |
 
 ## 已完成
@@ -53,6 +53,10 @@ git log --oneline -5
 - 外观主题：浅色（默认）/ 深色 / 跟随系统，设置面板切换，localStorage 持久化
 - humanize 类人行为、回收站、批量启停、档案导入/导出/复制
 - 档案搜索、标签、cookie 导入导出、时区跟随（`1a7d409`）
+- **每档案扩展管理**：UI 导入未打包目录/.crx（可选填商店链接或 ID）、列表/删除、
+  启动时合并进 `--load-extension`；CRX 导入可固定官方商店 ID（manifest `key`），
+  解决 muse.ai 这类按商店 ID 做 CSP `frame-ancestors` 白名单的站点
+  （`7decd36` / `c923888`）
 - 时区 56 项 / 语言 39 项
 - 单实例锁、一键启动/停止
 - 本地 FastAPI，只监听 `127.0.0.1` 随机端口，Bearer token 保护
@@ -230,6 +234,36 @@ Stop-Process -Id <mihomo的PID> -Force     # 2. 再杀 mihomo 孤儿（父进程
 - 本机 PowerShell 环境策略会拦截部分长命令、递归删除和组合 `Start-Process` 命令。遇到被拦时改用 Python 脚本执行。
 - `apply_patch` 对部分 CRLF 文件做局部修改会失败，稳定做法是 delete + add 整文件。
 - 大文件（EXE、安装包、仓库 clone）不要提交到 git；`dist/`、`build/`、`installer/*.exe`、`CloakBrowser-ref/`、`obscura-ref/` 已加入 `.gitignore`。
+
+### 扩展加载（2026-11-14 排查 Muse from Meta 全记录）
+
+三层坑叠加，逐层剥出来的：
+
+1. **cloakbrowser 的 `extension_paths` kwarg 会同时发
+   `--disable-extensions-except`**，把开发者模式加载的扩展静默禁用
+   （toast 显示 Extension loaded、Secure Preferences 有注册条目，但
+   chrome://extensions 不显示、SW 不跑）。修法：不走该 kwarg，改手动
+   `--load-extension`。
+2. **Playwright 默认参数带 `--disable-extensions`**，同样必须过滤——已加进
+   sessions.py 的 IGNORE_DEFAULT_ARGS 补丁。
+3. **未打包扩展的 ID = 路径哈希，不在任何白名单里**。muse.ai 的 CSP
+   `frame-ancestors` 只放行商店官方 ID `jnakhh...`，面板 iframe 被 CSP 掐死
+   → 拿不到凭据 → `wss://hatch.metaaivm.com` 401 → "Couldn't connect"。
+   修法：CRX 导入时按商店 ID（外部信息，**CRX 文件里不存自己的 ID**——
+   Chromium 用外部 ID 匹配 header 里多个 proof 公钥）选对应的 key 写进
+   manifest `key` 字段，未打包副本即获得官方 ID。
+
+**调试手段（下次直接用）**：CDP attach 后用裸 WebSocket 挂到
+`/json/list` 的 service_worker target 上（Playwright connectOverCDP 在这个
+内核上会挂死，别用），`Runtime.evaluate` + `awaitPromise` 直接在 SW 上下文
+跑探针；`Network.enable` 能抓到浏览器视角的真实握手错误（401/451 等）。
+注意 CDP 面板 target 的 Log.entryAdded 一次性抓到了 CSP 报错，是定位
+第 3 层坑的关键证据。
+
+**Muse from Meta 背景知识**：Meta 2026-11-13 发布的浏览器 Agent 扩展，
+`agent.meta.ai` 重定向到 muse.ai——它就是 muse.ai 的伴生扩展；后端
+`wss://hatch.metaaivm.com/v1/noise`。Binance/echo 的 WS 测试失败是端点
+自身的地区拦截（451）等红鲱鱼，与内核无关。
 
 ### CloakBrowser
 
