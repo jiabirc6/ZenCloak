@@ -163,14 +163,13 @@ def _manager(tmp_path, launcher=None, contexts=None, proxy_manager=None):
         contexts.append((kwargs, context))
         return context
 
-    return (
-        SessionManager(
-            data_root=tmp_path,
-            launcher=launcher or default_launcher,
-            proxy_manager=proxy_manager,
-        ),
-        contexts,
+    manager = SessionManager(
+        data_root=tmp_path,
+        launcher=launcher or default_launcher,
+        proxy_manager=proxy_manager,
+        window_fixup=lambda seed: None,
     )
+    return manager, contexts
 
 
 def _wait_status(manager, profile_id, target, timeout=5):
@@ -908,3 +907,52 @@ def test_launch_maximizes_into_real_work_area(tmp_path):
     manager.launch(_profile())
     _wait_status(manager, "aaaaaaaaaaaa", "running")
     assert "--start-maximized" in contexts[0][0]["args"]
+
+
+def test_launch_remaximizes_profile_window(tmp_path):
+    # Stale persisted placement hides the page bottom behind the taskbar;
+    # after launch the window must be re-maximized into the real work area.
+    import threading
+
+    calls = []
+    done = threading.Event()
+
+    def fake_fixup(seed):
+        calls.append(seed)
+        done.set()
+
+    manager, contexts = _manager(tmp_path)
+    manager._window_fixup = fake_fixup
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert done.wait(timeout=2), "window fixup was not invoked"
+    assert calls == [12345]
+    # 别泄漏空转的会话线程（会抢 GIL，影响后续测试）
+    manager.stop_all()
+
+
+def test_maximize_gives_up_when_window_never_appears(monkeypatch):
+    from types import SimpleNamespace
+    from zencloak.core import window
+
+    monkeypatch.setattr(
+        window.subprocess, "run",
+        lambda *a, **kw: SimpleNamespace(stdout=""),
+    )
+    monkeypatch.setattr(window.time, "sleep", lambda _: None)
+    assert window.maximize_profile_window(12345, timeout=0.05) is False
+
+
+def test_maximize_stops_at_first_window_handle(monkeypatch):
+    from types import SimpleNamespace
+    from zencloak.core import window
+
+    calls = []
+    monkeypatch.setattr(
+        window.subprocess, "run",
+        lambda *a, **kw: calls.append(kw.get("timeout")) or
+        SimpleNamespace(stdout="60099486"),
+    )
+    monkeypatch.setattr(window.time, "sleep", lambda _: None)
+    assert window.maximize_profile_window(12345, timeout=5) is True
+    assert len(calls) == 1

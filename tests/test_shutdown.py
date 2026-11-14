@@ -159,7 +159,7 @@ def test_shutdown_route_cleans_up_before_exiting(monkeypatch):
     log: list = []
     proxy = Recorder("proxy", log)
     store = ProfileStore(tempfile.mkdtemp(), auto_init=False)
-    sessions = SessionManager(data_root=store.data_dir)
+    sessions = SessionManager(data_root=store.data_dir, window_fixup=lambda seed: None)
     app = create_app(store, sessions, proxy_manager=proxy)
 
     cleaned: list[str] = []

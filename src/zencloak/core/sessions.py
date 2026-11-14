@@ -20,6 +20,7 @@ from .health import PROBE_JS
 from .launchers import launch_extra_kernel
 from .proxy_runtime import allocate_ports
 from .voices import build_voices_init_script
+from .window import maximize_profile_window
 
 
 class SessionError(RuntimeError):
@@ -93,10 +94,12 @@ class SessionManager:
         data_root: str | Path,
         launcher: Callable[..., Any] = launch_persistent_context,
         proxy_manager: Any = None,
+        window_fixup: Callable[[int], bool] | None = None,
     ) -> None:
         self.data_root = Path(data_root)
         self._launcher = launcher
         self._proxy_manager = proxy_manager
+        self._window_fixup = window_fixup or maximize_profile_window
         self._sessions: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
@@ -248,6 +251,18 @@ class SessionManager:
                 session["error"] = None
             self._prepare_start_page(context, profile)
             self._open_urls_from_queue(context, session)
+            # Chromium honours --start-maximized only on first run; afterwards
+            # the persisted placement wins, and a placement saved against a
+            # stale work area hides the page bottom behind the taskbar on
+            # every launch. Re-maximize so Windows recomputes from the
+            # current work area. Daemon thread: stop() joins this thread with
+            # a 5s timeout and the window fixup must never delay it.
+            threading.Thread(
+                target=self._window_fixup,
+                args=(profile["seed"],),
+                name=f"maximize-{profile['id']}",
+                daemon=True,
+            ).start()
             cdp = None
             while not session["stop_event"].is_set():
                 if not context.browser.is_connected():

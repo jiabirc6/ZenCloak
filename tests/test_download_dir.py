@@ -92,7 +92,7 @@ def test_unc_style_path_is_accepted(store):
 def test_session_manager_uses_the_custom_directory(store, tmp_path):
     """Launch kwargs must point the browser at the chosen folder."""
     custom = tmp_path / "session-custom"
-    manager = SessionManager(data_root=store.data_dir)
+    manager = SessionManager(data_root=store.data_dir, window_fixup=lambda seed: None)
     profile = store.create_profile(_draft(download_dir=str(custom)))
 
     resolved = manager._downloads_dir(profile)
@@ -103,7 +103,7 @@ def test_session_manager_uses_the_custom_directory(store, tmp_path):
 
 
 def test_session_manager_falls_back_without_custom_dir(store):
-    manager = SessionManager(data_root=store.data_dir)
+    manager = SessionManager(data_root=store.data_dir, window_fixup=lambda seed: None)
     profile = store.create_profile(_draft())
     resolved = manager._downloads_dir(profile)
     assert resolved == store.profile_data_subdir(profile["id"], "Downloads")
