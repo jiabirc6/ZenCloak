@@ -74,7 +74,10 @@ def _chromium_kwargs(
     cdp_port: int | None,
     ext_dir: str | None,
 ) -> dict:
-    args = [f"--lang={profile['locale']}"]
+    # Maximize into the real work area: the screen fingerprint (e.g. 1080)
+    # disagrees with the actual desktop by the taskbar height, and the
+    # persisted window placement then hides the page bottom behind it.
+    args = [f"--lang={profile['locale']}", "--start-maximized"]
     if profile.get("user_agent"):
         args.append(f"--user-agent={profile['user_agent']}")
     if cdp_port:

@@ -426,6 +426,7 @@ class SessionManager:
             f"--fingerprint-screen-height={profile['screen_height']}",
             f"--lang={profile['locale']}",
             "--hide-crash-restore-bubble",
+            "--start-maximized",
             f"--fingerprint-locale={profile['locale']}",
             f"--disable-features={_DISABLE_FEATURES}",
             "--enable-features=Translate",

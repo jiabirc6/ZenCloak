@@ -898,3 +898,13 @@ def test_launch_loads_user_extensions(tmp_path):
     assert len(load_args) == 1
     assert "newtab-v3" in load_args[0]
     assert "user-foo" in load_args[0]
+
+
+def test_launch_maximizes_into_real_work_area(tmp_path):
+    # The screen fingerprint (e.g. 1080 tall) is taller than the real work
+    # area (screen minus taskbar); without --start-maximized the persisted
+    # window placement hides the page bottom behind the Windows taskbar.
+    manager, contexts = _manager(tmp_path)
+    manager.launch(_profile())
+    _wait_status(manager, "aaaaaaaaaaaa", "running")
+    assert "--start-maximized" in contexts[0][0]["args"]
