@@ -145,6 +145,8 @@ REMEDIATION 第 85 行的验收标准（「有 → 抽象 keyring 后端」）�
 
 - 旧版 `pythonw -m zencloak` 和测试残留的 `ZenCloak.exe` 会占用单实例锁，导致新启动弹「已在运行」。处理方式：任务管理器结束所有 `ZenCloak` / `pythonw` 进程。
 - PyInstaller onefile 被强制结束后可能残留子进程，同样会占锁。
+- **⚠️ stop/launch 会话 = 杀用户正在用的浏览器窗口（2026-11-14 事故）**：cookie/登录态不丢（持久化档案），但打开的标签页会没。改会话级配置（cdp_attach、内核等）前**必须先确认用户没在用**；万一关了，上一轮标签页可从
+  `Default/Sessions/Tabs_*`（SNSS）提取 URL 重开，或让用户按 Ctrl+Shift+T。
 
 #### 「点退出没反应」的挂起 —— 已修复（`3c8fe14`）
 
