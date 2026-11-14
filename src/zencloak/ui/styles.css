@@ -1568,6 +1568,32 @@ textarea {
   padding: 0 10px;
 }
 
+/* ===== Per-profile extension management ===== */
+.extension-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.extension-list .hint {
+  margin: 0;
+}
+
+.extension-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.extension-name small {
+  color: var(--faint);
+}
+
 .hint {
   margin: 0;
   color: var(--muted);

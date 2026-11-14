@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -957,3 +959,70 @@ def test_export_dir_rejects_a_relative_path_on_write(client):
     profile = store.create_profile(_draft("坏路径"))
     with pytest.raises(ValidationError):
         store.update_profile(profile["id"], {"export_dir": "relative/path"})
+
+
+# ---------------------------------------------------------------------------
+# Per-profile extension management
+# ---------------------------------------------------------------------------
+
+
+def _write_extension_dir(root: Path, name="Muse", version="2.0.65"):
+    ext = root / name
+    ext.mkdir(parents=True)
+    (ext / "manifest.json").write_text(
+        json.dumps({"manifest_version": 3, "name": name, "version": version}),
+        encoding="utf-8",
+    )
+    return ext
+
+
+def test_extension_import_list_delete_roundtrip(client, tmp_path):
+    api_client, _, _ = client
+    profile_id = api_client.get("/api/profiles").json()[0]["id"]
+
+    listed = api_client.get(f"/api/profiles/{profile_id}/extensions")
+    assert listed.status_code == 200
+    assert listed.json() == {"extensions": []}
+
+    src = _write_extension_dir(tmp_path)
+    imported = api_client.post(
+        f"/api/profiles/{profile_id}/extensions/import", json={"path": str(src)}
+    )
+    assert imported.status_code == 200
+    body = imported.json()
+    assert body["extension"]["name"] == "Muse"
+    assert body["extension"]["version"] == "2.0.65"
+    assert body["restart_required"] is False
+
+    listed = api_client.get(f"/api/profiles/{profile_id}/extensions")
+    assert [item["name"] for item in listed.json()["extensions"]] == ["Muse"]
+
+    ext_id = body["extension"]["id"]
+    deleted = api_client.delete(f"/api/profiles/{profile_id}/extensions/{ext_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["removed"] is True
+    assert api_client.get(f"/api/profiles/{profile_id}/extensions").json() == {
+        "extensions": []
+    }
+
+
+def test_extension_import_rejects_bad_source(client, tmp_path):
+    api_client, _, _ = client
+    profile_id = api_client.get("/api/profiles").json()[0]["id"]
+    missing = api_client.post(
+        f"/api/profiles/{profile_id}/extensions/import",
+        json={"path": str(tmp_path / "nope")},
+    )
+    assert missing.status_code == 400
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    bad = api_client.post(
+        f"/api/profiles/{profile_id}/extensions/import", json={"path": str(empty_dir)}
+    )
+    assert bad.status_code == 400
+
+
+def test_extension_endpoints_require_existing_profile(client):
+    api_client, _, _ = client
+    response = api_client.get("/api/profiles/doesnotexist/extensions")
+    assert response.status_code == 404

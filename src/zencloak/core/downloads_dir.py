@@ -71,3 +71,51 @@ def ask_directory(initial: str | Path | None = None, title: str = "选择下载�
         raise error["exc"]
     chosen = result["path"]
     return str(Path(chosen)) if chosen else None
+
+
+def ask_open_file(
+    initial: str | Path | None = None,
+    title: str = "选择文件",
+    filetypes: list[tuple[str, str]] | None = None,
+) -> str | None:
+    """Show the OS file picker; return the path, or None if cancelled.
+
+    Mirrors :func:`ask_directory` (worker thread, hidden tkinter root) but
+    picks files, so CRX installers can be chosen the same native way.
+    """
+    result: dict[str, str | None] = {"path": None}
+    error: dict[str, BaseException | None] = {"exc": None}
+
+    def _run() -> None:
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            try:
+                start = None
+                if initial:
+                    candidate = Path(initial)
+                    if candidate.exists():
+                        start = str(candidate if candidate.is_file() else candidate.parent)
+                chosen = filedialog.askopenfilename(
+                    title=title, initialfile=start, filetypes=filetypes or []
+                )
+                result["path"] = chosen or None
+            finally:
+                root.destroy()
+        except BaseException as exc:  # noqa: BLE001 - reported to the caller
+            error["exc"] = exc
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=300)
+
+    if thread.is_alive():
+        return None
+    if error["exc"] is not None:
+        raise error["exc"]
+    chosen = result["path"]
+    return str(Path(chosen)) if chosen else None

@@ -490,6 +490,25 @@
                 导入前请先停止该档案。
               </p>
             </div>
+            <div class="field full">
+              <label>浏览器扩展</label>
+              <div id="extensionList" class="extension-list"></div>
+              <div class="path-picker">
+                <input id="extensionStoreId" type="text" placeholder="商店链接或扩展 ID（可选，固定官方 ID 用）">
+                <button id="importExtensionDir" class="btn" type="button">
+                  <i data-lucide="folder-open"></i>导入扩展目录
+                </button>
+                <button id="importExtensionCrx" class="btn" type="button">
+                  <i data-lucide="package"></i>导入 .crx 安装包
+                </button>
+              </div>
+              <p class="hint">
+                导入未打包的扩展目录或 .crx 安装包，导入后（重启档案）自动加载。
+                商店插件建议顺手填上商店链接或扩展 ID——部分站点（如 muse.ai）
+                只认官方扩展 ID，不填会加载成功但连不上。
+                也可以直接在浏览器 <code>chrome://extensions</code> 用开发者模式加载。
+              </p>
+            </div>
           </div>
         </form>
       </section>

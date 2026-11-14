@@ -428,6 +428,7 @@ function renderForm() {
   $("spoofVoices").checked = profile.spoof_voices !== false;
   $("downloadDir").value = profile.download_dir || "";
   $("exportDir").value = profile.export_dir || "";
+  loadExtensions();
   const proxy = profile.proxy;
   const builtinProxy = Boolean(profile.proxy_enabled) && profile.proxy_mode === "mihomo";
   $("proxyBuiltin").checked = builtinProxy;
@@ -1586,6 +1587,79 @@ function bindEvents() {
     $("downloadDir").value = "";
     toast("已恢复为默认下载目录，保存后生效");
   });
+  $("importExtensionDir").addEventListener("click", () => importExtension("dir"));
+  $("importExtensionCrx").addEventListener("click", () => importExtension("crx"));
+}
+
+async function loadExtensions() {
+  if (!state.selectedId) return;
+  const list = $("extensionList");
+  if (!list) return;
+  list.innerHTML = "";
+  try {
+    const result = await api(`/api/profiles/${state.selectedId}/extensions`);
+    const extensions = result.extensions || [];
+    if (!extensions.length) {
+      list.innerHTML = '<p class="hint">还没有导入扩展。</p>';
+      return;
+    }
+    for (const ext of extensions) {
+      const row = document.createElement("div");
+      row.className = "extension-row";
+      row.innerHTML =
+        `<span class="extension-name">${escapeHtml(ext.name)}` +
+        (ext.version ? ` <small>v${escapeHtml(ext.version)}</small>` : "") +
+        `</span>` +
+        `<button class="btn danger" type="button" data-ext-id="${escapeHtml(ext.id)}">` +
+        `<i data-lucide="trash-2"></i>删除</button>`;
+      row.querySelector("button").addEventListener("click", () => removeExtension(ext.id, ext.name));
+      list.appendChild(row);
+    }
+    if (window.lucide) lucide.createIcons();
+  } catch (error) {
+    list.innerHTML = "";
+    toast(error.message, true);
+  }
+}
+
+async function importExtension(kind) {
+  if (!state.selectedId) return;
+  try {
+    const picked = await api(
+      `/api/profiles/${state.selectedId}/extensions/${kind === "crx" ? "pick-file" : "pick-dir"}`,
+      { method: "POST" }
+    );
+    if (picked.cancelled || !picked.path) return;
+    const result = await api(
+      `/api/profiles/${state.selectedId}/extensions/import`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          path: picked.path,
+          store_id: $("extensionStoreId").value.trim() || null,
+        }),
+      }
+    );
+    toast(`已导入 ${result.extension.name}，${result.restart_required ? "重启档案后生效" : "下次启动档案生效"}`);
+    loadExtensions();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function removeExtension(extId, extName) {
+  if (!state.selectedId) return;
+  if (!confirm(`删除扩展 ${extName}？`)) return;
+  try {
+    const result = await api(
+      `/api/profiles/${state.selectedId}/extensions/${encodeURIComponent(extId)}`,
+      { method: "DELETE" }
+    );
+    toast(result.restart_required ? "已删除，重启档案后不再加载" : "已删除");
+    loadExtensions();
+  } catch (error) {
+    toast(error.message, true);
+  }
 }
 
 async function pickDownloadDir() {

@@ -22,8 +22,13 @@ from zencloak.core.cookies import (
     read_cookies,
     write_cookies,
 )
-from zencloak.core.downloads_dir import ask_directory, download_dir_for
+from zencloak.core.downloads_dir import ask_directory, ask_open_file, download_dir_for
 from zencloak.core.exports import ExportError, export_dir, write_export
+from zencloak.core.extensions import (
+    import_user_extension,
+    list_user_extensions,
+    remove_user_extension,
+)
 from zencloak.core.fingerprint import default_profile_draft
 from zencloak.core.health import build_report
 from zencloak.core.launchers import KERNELS, kernel_availability
@@ -357,6 +362,78 @@ def create_app(
         except Exception as exc:  # noqa: BLE001 - surface OS errors to the UI
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return {"opened": True, "path": str(target)}
+
+    @app.get("/api/profiles/{profile_id}/extensions")
+    def list_profile_extensions(profile_id: str) -> dict:
+        """Extensions imported into this profile (ZenCloak-managed)."""
+        profile_or_404(profile_id)
+        return {"extensions": list_user_extensions(sessions.data_root, profile_id)}
+
+    @app.post("/api/profiles/{profile_id}/extensions/pick-dir")
+    def pick_extension_dir(profile_id: str) -> dict:
+        """Open the native folder picker for an unpacked extension folder."""
+        profile_or_404(profile_id)
+        try:
+            chosen = ask_directory(title="选择未打包扩展目录")
+        except Exception as exc:  # noqa: BLE001 - surface picker problems to the UI
+            raise HTTPException(
+                status_code=500, detail=f"无法打开目录选择框: {exc}"
+            ) from exc
+        if not chosen:
+            return {"cancelled": True, "path": None}
+        return {"cancelled": False, "path": chosen}
+
+    @app.post("/api/profiles/{profile_id}/extensions/pick-file")
+    def pick_extension_file(profile_id: str) -> dict:
+        """Open the native file picker for a .crx installer."""
+        profile_or_404(profile_id)
+        try:
+            chosen = ask_open_file(
+                title="选择 .crx 安装包",
+                filetypes=[("Chrome 扩展安装包", "*.crx"), ("所有文件", "*.*")],
+            )
+        except Exception as exc:  # noqa: BLE001 - surface picker problems to the UI
+            raise HTTPException(
+                status_code=500, detail=f"无法打开文件选择框: {exc}"
+            ) from exc
+        if not chosen:
+            return {"cancelled": True, "path": None}
+        return {"cancelled": False, "path": chosen}
+
+    @app.post("/api/profiles/{profile_id}/extensions/import")
+    def import_profile_extension(profile_id: str, payload: dict) -> dict:
+        """Import an unpacked extension folder or .crx into this profile.
+
+        Takes effect on the next launch; ``restart_required`` tells the UI
+        whether the profile is currently running and needs a restart.
+        """
+        profile_or_404(profile_id)
+        raw = str((payload or {}).get("path") or "").strip()
+        if not raw:
+            raise HTTPException(status_code=400, detail="缺少导入路径")
+        store_id = str((payload or {}).get("store_id") or "").strip() or None
+        try:
+            extension = import_user_extension(
+                sessions.data_root, profile_id, raw, store_id=store_id
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        restart_required = (
+            sessions.status(profile_id).get("status") in {"launching", "running"}
+        )
+        return {"extension": extension, "restart_required": restart_required}
+
+    @app.delete("/api/profiles/{profile_id}/extensions/{ext_id}")
+    def delete_profile_extension(profile_id: str, ext_id: str) -> dict:
+        profile_or_404(profile_id)
+        try:
+            remove_user_extension(sessions.data_root, profile_id, ext_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        restart_required = (
+            sessions.status(profile_id).get("status") in {"launching", "running"}
+        )
+        return {"removed": True, "restart_required": restart_required}
 
     @app.put("/api/profiles/{profile_id}")
     def update_profile(profile_id: str, payload: dict[str, Any]) -> dict:

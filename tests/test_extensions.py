@@ -1,8 +1,21 @@
+import base64
+import hashlib
+import io
 import json
+import pathlib
+import zipfile
+
+import pytest
 
 from zencloak.core.extensions import (
     build_newtab_extension,
     cleanup_stale_newtab_extensions,
+    import_user_extension,
+    list_user_extensions,
+    remove_user_extension,
+    _pinned_key_from_crx,
+    _store_id_for_key,
+    user_extension_dirs,
 )
 
 
@@ -240,3 +253,221 @@ def test_content_script_survives_toggling_the_option_off(tmp_path):
     manifest = json.loads((ext_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["content_scripts"], "关闭选项后仍须注册 content script"
     assert (ext_dir / "content.js").exists(), "关闭选项后仍须保留 content.js"
+
+
+# ---------------------------------------------------------------------------
+# User-imported extensions
+# ---------------------------------------------------------------------------
+
+_PROFILE_ID = "aaaaaaaaaaaa"
+
+
+def _write_ext_dir(root, name="Foo", version="1.0.0", manifest_name=None, default_locale=None):
+    """Create an unpacked extension folder; returns its path."""
+    ext = root / name
+    ext.mkdir(parents=True)
+    manifest = {"manifest_version": 3, "name": manifest_name or name, "version": version}
+    if default_locale:
+        manifest["default_locale"] = default_locale
+    (ext / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    if manifest_name:
+        locale_dir = ext / "_locales" / (default_locale or "en")
+        locale_dir.mkdir(parents=True)
+        (locale_dir / "messages.json").write_text(
+            json.dumps({"extensionName": {"message": name}}), encoding="utf-8"
+        )
+    return ext
+
+
+def _make_crx(path, src_dir):
+    """Pack an extension directory into a minimal CRX3-shaped file."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as bundle:
+        for file in src_dir.rglob("*"):
+            bundle.write(file, file.relative_to(src_dir))
+    path.write_bytes(b"Cr24" + b"\x00" * 16 + buf.getvalue())
+    return path
+
+
+def test_import_user_extension_from_dir(tmp_path):
+    src = _write_ext_dir(tmp_path / "src", name="Muse", version="2.0.65")
+    result = import_user_extension(tmp_path / "data", _PROFILE_ID, src)
+    assert result["name"] == "Muse"
+    assert result["version"] == "2.0.65"
+    assert result["id"].startswith("user-")
+    listed = list_user_extensions(tmp_path / "data", _PROFILE_ID)
+    assert [item["name"] for item in listed] == ["Muse"]
+
+
+def test_import_resolves_msg_manifest_name(tmp_path):
+    src = _write_ext_dir(
+        tmp_path / "src",
+        name="Muse from Meta",
+        manifest_name="__MSG_extensionName__",
+        default_locale="en",
+    )
+    result = import_user_extension(tmp_path / "data", _PROFILE_ID, src)
+    assert result["name"] == "Muse from Meta"
+
+
+def test_import_crx_strips_header(tmp_path):
+    src = _write_ext_dir(tmp_path / "src", name="Packed", version="3.2.1")
+    crx = _make_crx(tmp_path / "packed.crx", src)
+    result = import_user_extension(tmp_path / "data", _PROFILE_ID, crx)
+    assert result["name"] == "Packed"
+    assert result["version"] == "3.2.1"
+    dest = tmp_path / "data" / _PROFILE_ID / "extensions" / result["id"]
+    assert (dest / "manifest.json").exists()
+
+
+def test_import_rejects_duplicate(tmp_path):
+    src = _write_ext_dir(tmp_path / "src")
+    import_user_extension(tmp_path / "data", _PROFILE_ID, src)
+    with pytest.raises(ValueError, match="已存在"):
+        import_user_extension(tmp_path / "data", _PROFILE_ID, src)
+
+
+def test_import_rejects_invalid_sources(tmp_path):
+    empty = tmp_path / "notext"
+    empty.mkdir()
+    with pytest.raises(ValueError, match="manifest"):
+        import_user_extension(tmp_path / "data", _PROFILE_ID, empty)
+    with pytest.raises(ValueError, match="路径不存在"):
+        import_user_extension(tmp_path / "data", _PROFILE_ID, tmp_path / "missing")
+    bad_crx = tmp_path / "bad.crx"
+    bad_crx.write_bytes(b"PK\x03\x04zipzip")
+    with pytest.raises(ValueError, match="Cr24"):
+        import_user_extension(tmp_path / "data", _PROFILE_ID, bad_crx)
+    other = tmp_path / "other.txt"
+    other.write_text("x", encoding="utf-8")
+    with pytest.raises(ValueError, match="未打包扩展目录"):
+        import_user_extension(tmp_path / "data", _PROFILE_ID, other)
+
+
+def test_remove_user_extension_roundtrip(tmp_path):
+    src = _write_ext_dir(tmp_path / "src")
+    result = import_user_extension(tmp_path / "data", _PROFILE_ID, src)
+    ext_id = result["id"]
+    assert user_extension_dirs(tmp_path / "data", _PROFILE_ID)
+    remove_user_extension(tmp_path / "data", _PROFILE_ID, ext_id)
+    assert user_extension_dirs(tmp_path / "data", _PROFILE_ID) == []
+    with pytest.raises(ValueError, match="不存在"):
+        remove_user_extension(tmp_path / "data", _PROFILE_ID, ext_id)
+
+
+def test_remove_rejects_traversal_and_managed_dirs(tmp_path):
+    with pytest.raises(ValueError):
+        remove_user_extension(tmp_path / "data", _PROFILE_ID, "../escape")
+    with pytest.raises(ValueError):
+        remove_user_extension(tmp_path / "data", _PROFILE_ID, "newtab-v3")
+
+
+def test_crx_import_pins_store_extension_id(tmp_path):
+    # Real-world known answer: muse.ai CSP frame-ancestors whitelists the
+    # store ID of "Muse from Meta". A CRX import must pin the signing key
+    # from the CRX3 header so the unpacked copy keeps that exact ID.
+    muse_key = (
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAud+Kpoe4Ju0njwgICKHHmEBG"
+        "/pBR8F0jbTuUWDSmnWsiS002BE7FFhBoXVet4HEhAAIDdJYjanKN3G9rgOb/bf3NZPTA"
+        "MrENViMGysmN9GefzbdAjcKrHI/3lABUemmRRM0OSjQ7Gs5Nsi11Y7VpA619XQjtrpqOX"
+        "cT+nXKJ6l3GhWdBTyxaGy00snjrpV7G9TMk9IIV0TF8vgmyoxYCyR66ZGj6zzwnhyAtuO"
+        "hK1bo6EpCDGLw58885DA/g2YSLuW47R7EeNL6yX9gap2XwNy7kBGe27VvzcHZDvRdN5zn"
+        "rVTo1YjZoJX46V2wl/T1RyS56QWDoc0n6+vo/vHYyJwIDAQAB"
+    )
+    muse_store_id = "jnakhhjmpmoohbjgfccbccfoifnmbdjd"
+    assert _store_id_for_key(base64.b64decode(muse_key)) == muse_store_id
+
+    der = base64.b64decode(muse_key)
+    def _varint(n):
+        out = b""
+        while True:
+            b = n & 0x7F
+            n >>= 7
+            out += bytes([b | 0x80]) if n else bytes([b])
+            if not n:
+                return out
+    # Proper CRX3 header: field 2 = signature entry carrying the key,
+    # field 3 = signed_header_data embedding SignedData.crx_id (field 1).
+    crx_id = hashlib.sha256(der).digest()[:16]
+    signed_data = b"\x0a" + _varint(len(crx_id)) + crx_id
+    header = (
+        b"\x12" + _varint(len(der)) + der
+        + b"\x1a" + _varint(len(signed_data)) + signed_data
+    )
+    crx = (
+        b"Cr24"
+        + (3).to_bytes(4, "little")
+        + len(header).to_bytes(4, "little")
+        + header
+        + b"PK\x03\x04zipdata"
+    )
+    crx_path = tmp_path / "muse.crx"
+    crx_path.write_bytes(crx)
+    # A CRX whose zip part has no manifest is rejected; build a valid one.
+    src_dir = _write_ext_dir(tmp_path / "src", name="Muse from Meta", version="2.0.65")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as bundle:
+        for file in src_dir.rglob("*"):
+            bundle.write(file, file.relative_to(src_dir))
+    crx_path.write_bytes(crx[: 12 + len(header)] + buf.getvalue())
+
+    result = import_user_extension(
+        tmp_path / "data", _PROFILE_ID, crx_path, store_id=muse_store_id
+    )
+    stored = json.loads(
+        (pathlib.Path(result["dir"]) / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert stored["key"] == muse_key
+
+
+def test_crx_import_without_store_id_skips_pinning(tmp_path):
+    # The CRX file does not record its own ID; without an externally known
+    # store ID there is no safe selector, so no key must be pinned.
+    der = base64.b64decode(
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAud+Kpoe4Ju0njwgICKHHmEBG"
+        "/pBR8F0jbTuUWDSmnWsiS002BE7FFhBoXVet4HEhAAIDdJYjanKN3G9rgOb/bf3NZPTA"
+        "MrENViMGysmN9GefzbdAjcKrHI/3lABUemmRRM0OSjQ7Gs5Nsi11Y7VpA619XQjtrpqOX"
+        "cT+nXKJ6l3GhWdBTyxaGy00snjrpV7G9TMk9IIV0TF8vgmyoxYCyR66ZGj6zzwnhyAtuO"
+        "hK1bo6EpCDGLw58885DA/g2YSLuW47R7EeNL6yX9gap2XwNy7kBGe27VvzcHZDvRdN5zn"
+        "rVTo1YjZoJX46V2wl/T1RyS56QWDoc0n6+vo/vHYyJwIDAQAB"
+    )
+    def _varint(n):
+        out = b""
+        while True:
+            b = n & 0x7F
+            n >>= 7
+            out += bytes([b | 0x80]) if n else bytes([b])
+            if not n:
+                return out
+    crx_id = hashlib.sha256(der).digest()[:16]
+    signed_data = b"\x0a" + _varint(len(crx_id)) + crx_id
+    header = (
+        b"\x12" + _varint(len(der)) + der
+        + b"\x1a" + _varint(len(signed_data)) + signed_data
+    )
+    src_dir = _write_ext_dir(tmp_path / "src", name="Muse from Meta", version="2.0.65")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as bundle:
+        for file in src_dir.rglob("*"):
+            bundle.write(file, file.relative_to(src_dir))
+    crx = (
+        b"Cr24" + (3).to_bytes(4, "little") + len(header).to_bytes(4, "little")
+        + header + buf.getvalue()
+    )
+    crx_path = tmp_path / "muse.crx"
+    crx_path.write_bytes(crx)
+    result = import_user_extension(tmp_path / "data", _PROFILE_ID, crx_path)
+    stored = json.loads(
+        (pathlib.Path(result["dir"]) / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert "key" not in stored
+
+
+def test_parse_store_extension_id_accepts_url_or_bare_id():
+    from zencloak.core.extensions import parse_store_extension_id
+    url = "https://chromewebstore.google.com/detail/muse-from-meta/jnakhhjmpmoohbjgfccbccfoifnmbdjd"
+    assert parse_store_extension_id(url) == "jnakhhjmpmoohbjgfccbccfoifnmbdjd"
+    assert parse_store_extension_id("jnakhhjmpmoohbjgfccbccfoifnmbdjd") == "jnakhhjmpmoohbjgfccbccfoifnmbdjd"
+    assert parse_store_extension_id("不是链接") is None
+    assert parse_store_extension_id("") is None
+    assert parse_store_extension_id(None) is None
