@@ -12,6 +12,8 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 仓库：https://github.com/jiabirc6/ZenCloak
 版本：`0.4.0`
 
+> **开发收尾约定（所有 AI 会话适用）**：完成开发后须 ① 刷新本文件「当前状态 / 已完成 / 未完成」并随代码提交推送 ② 在 Obsidian `E:\obsidian\J-zencloak项目\开发日志.md` 追加本次开发记录（日期 / HEAD / 完成内容 / 测试状态）。
+
 ## 如何确认现状
 
 ```powershell
