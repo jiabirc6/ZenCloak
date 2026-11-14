@@ -18,7 +18,7 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 ```powershell
 cd E:\codex\opencode-zen\zencloak
-python -m pytest tests -q          # 期望 422 passed，约 70 秒
+python -m pytest tests -q          # 期望 425 passed，约 45 秒
 git status --short                 # 期望无输出（工作树干净）
 git log --oneline -5
 ```
@@ -30,7 +30,7 @@ git log --oneline -5
 | 版本 | `0.4.0` |
 | 测试 | ✅ 422 passed（约 70 秒） |
 | 工作树 | 干净 |
-| HEAD | `c923888` |
+| HEAD | `0a31900` |
 | 依赖 | cloakbrowser 0.3.31 / playwright 1.60.0 / fastapi 0.141.1 |
 
 ## 已完成
@@ -53,6 +53,11 @@ git log --oneline -5
 - 外观主题：浅色（默认）/ 深色 / 跟随系统，设置面板切换，localStorage 持久化
 - humanize 类人行为、回收站、批量启停、档案导入/导出/复制
 - 档案搜索、标签、cookie 导入导出、时区跟随（`1a7d409`）
+- **内置代理分流（cn_direct，默认开）**：mihomo 改 rule 模式——69 条国内域名
+  后缀（手写清单，不依赖 GeoIP 下载）+ 私网 CIDR 直连，其余走 GLOBAL 组选的
+  节点；档案编辑代理页有「国内网站直连」开关，关掉回到全局模式。实测淘宝
+  全家 DIRECT、muse.ai 走美国节点（`0a31900`）
+- **窗口最大化**：启动参数加 `--start-maximized`（`488f822`）
 - **每档案扩展管理**：UI 导入未打包目录/.crx（可选填商店链接或 ID）、列表/删除、
   启动时合并进 `--load-extension`；CRX 导入可固定官方商店 ID（manifest `key`），
   解决 muse.ai 这类按商店 ID 做 CSP `frame-ancestors` 白名单的站点
