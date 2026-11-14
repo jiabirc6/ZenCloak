@@ -18,7 +18,7 @@ ZenCloak 是一个基于 CloakBrowser stealth Chromium 的个人指纹浏览器�
 
 ```powershell
 cd E:\codex\opencode-zen\zencloak
-python -m pytest tests -q          # 期望 425 passed，约 45 秒
+python -m pytest tests -q          # 期望 428 passed，约 55 秒
 git status --short                 # 期望无输出（工作树干净）
 git log --oneline -5
 ```
@@ -30,7 +30,7 @@ git log --oneline -5
 | 版本 | `0.4.0` |
 | 测试 | ✅ 422 passed（约 70 秒） |
 | 工作树 | 干净 |
-| HEAD | `0a31900` |
+| HEAD | `ada1550`..`最新` |
 | 依赖 | cloakbrowser 0.3.31 / playwright 1.60.0 / fastapi 0.141.1 |
 
 ## 已完成
@@ -241,6 +241,20 @@ Stop-Process -Id <mihomo的PID> -Force     # 2. 再杀 mihomo 孤儿（父进程
 - 本机 PowerShell 环境策略会拦截部分长命令、递归删除和组合 `Start-Process` 命令。遇到被拦时改用 Python 脚本执行。
 - `apply_patch` 对部分 CRLF 文件做局部修改会失败，稳定做法是 delete + add 整文件。
 - 大文件（EXE、安装包、仓库 clone）不要提交到 git；`dist/`、`build/`、`installer/*.exe`、`CloakBrowser-ref/`、`obscura-ref/` 已加入 `.gitignore`。
+
+### 窗口底部被任务栏遮挡（2026-11-14）
+
+三层事实：① 档案持久化的窗口几何会过期（任务栏 48px + 屏幕指纹 1080，工作区只有 1032）；
+② Chromium 的 `--start-maximized` **只在档案首次运行生效**，之后持久化位置记忆优先，
+旗标救不了过期几何；③ 修复 = 每次启动后由守护线程跑 PowerShell 子进程
+（core/window.py），按档案唯一的 `--fingerprint=<seed>` 找到主窗口并
+`ShowWindow(SW_SHOWMAXIMIZED)`，Windows 按当前工作区重算边界。
+SessionManager 构造参数 `window_fixup` 可注入（测试用 no-op）。
+
+**为什么修复必须在子进程**：ctypes EnumWindows 的 Python 回调要拿 GIL，
+泄漏的会话线程纯 Python 空转会把它饿死（表现为 EnumWindows 永不返回、
+测试挂死）。子进程完全不碰 GIL。调试时 faulthandler.dump_traceback_later
+抓全线程栈是定位手段（scripts 在 E:\zcode-cc\zencloak-debug，已删）。
 
 ### 扩展加载（2026-11-14 排查 Muse from Meta 全记录）
 
