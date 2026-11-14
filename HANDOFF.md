@@ -30,7 +30,7 @@ git log --oneline -5
 | 版本 | `0.4.0` |
 | 测试 | ✅ 422 passed（约 70 秒） |
 | 工作树 | 干净 |
-| HEAD | `ada1550`..`最新` |
+| HEAD | `586875c` |
 | 依赖 | cloakbrowser 0.3.31 / playwright 1.60.0 / fastapi 0.141.1 |
 
 ## 已完成
